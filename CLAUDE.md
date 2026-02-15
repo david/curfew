@@ -18,6 +18,8 @@ The image is built by GitHub Actions (`.github/workflows/build-boxkit.yml`) usin
 
 - `ContainerFiles/curfew` — the Containerfile (the main artifact of this repo)
 - `scripts/add-apt-repo.sh` — reusable helper to add apt repos with GPG keys: `add-apt-repo <name> <key-url> <deb-url> [components...]`
+- `bin/curfew` — launcher script (intended for `~/.local/bin`); mounts Wayland, D-Bus, GPU, and the project directory
+- `terminfo/` — kitty terminfo, copied into the image at build time
 - `cosign.pub` — public key for image verification
 - `cosign.key` — private key (gitignored, never commit)
 
@@ -26,13 +28,13 @@ The image is built by GitHub Actions (`.github/workflows/build-boxkit.yml`) usin
 The Containerfile is organized in layers:
 
 1. **Base apt packages** — Wayland libs, Mesa/GPU drivers, wl-clipboard, core utilities, locale generation
-2. **ENV** — `LANG`, `LC_ALL` (en_US.UTF-8), `AGENT_BROWSER_EXECUTABLE_PATH` (points to system Chrome)
+2. **ENV** — `LANG`, `LC_ALL` (en_US.UTF-8), `AGENT_BROWSER_EXECUTABLE_PATH` (system Chrome), `DBUS_SESSION_BUS_ADDRESS`
 3. **Third-party apt repos** — uses `add-apt-repo.sh` helper, then installs (currently: Google Chrome)
-4. **CLI tools via [ubi](https://github.com/houseabsolute/ubi)** — single-binary tools from GitHub releases (bat, eza, atuin, rg, mailpit, process-compose, direnv, starship, agent-browser, beads)
+4. **CLI tools via [ubi](https://github.com/houseabsolute/ubi)** — single-binary tools from GitHub releases (bat, eza, atuin, rg, mailpit, process-compose, direnv, starship, lazygit, agent-browser, beads)
 5. **ble.sh** — installed to `/usr/local/share/blesh`
-6. **User setup** — removes default `ubuntu` user, creates `app` (uid/gid 1000) with passwordless sudo
-7. **Claude Code** — installed as `app` user via official install script
-8. **WORKDIR /app**
+6. **Kitty terminfo** — `xterm-kitty` copied to `/usr/share/terminfo/x/`
+7. **User setup** — removes default `ubuntu` user, creates `app` (uid/gid 1000) with passwordless sudo
+8. **Claude Code** — installed as `app` user via official install script
 
 ## Adding Tools
 
@@ -47,3 +49,5 @@ The Containerfile is organized in layers:
 - Clean up apt caches in the same RUN layer (`apt-get clean && rm -rf /var/lib/apt/lists/*`).
 - Shell init (ble.sh, direnv, starship, atuin) is **not** baked into `.bashrc` — it's provided via volume mounts at runtime.
 - Node.js is per-project, not in the base image. Playwright uses system Chrome (`channel: 'chrome'`).
+- The container mounts the host project directory at the same path (no `/app` indirection). The launcher script handles this via `--workdir`.
+- `TERM` is passed through from the host so kitty terminfo works automatically.
