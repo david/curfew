@@ -1,0 +1,16 @@
+#!/bin/bash
+set -euo pipefail
+
+# Install Bun.
+# Usage: /usr/local/installs/bun [version]
+# Default: latest
+
+version="${1:-latest}"
+
+export BUN_INSTALL=/usr/local
+
+if [ "$version" = "latest" ]; then
+    curl -fsSL https://bun.sh/install | bash
+else
+    curl -fsSL https://bun.sh/install | bash -s "bun-v${version}"
+fi
