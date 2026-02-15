@@ -78,7 +78,8 @@ RUN userdel -r ubuntu \
     && groupadd -g 1000 app \
     && useradd -u 1000 -g 1000 -m -s /bin/bash app \
     && mkdir -p /app \
-    && chown app:app /app
+    && chown app:app /app \
+    && echo 'app ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/app
 
 USER app
 WORKDIR /app
