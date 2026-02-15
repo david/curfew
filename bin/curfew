@@ -81,11 +81,19 @@ case "${1:-}" in
             "$@"
         ;;
     build)
+        shift
+        build_flags=()
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                -f|--force) build_flags+=(--no-cache); shift ;;
+                *) echo "Unknown option: $1" >&2; exit 1 ;;
+            esac
+        done
         if [ ! -f ".curfew.dockerfile" ]; then
             echo "No .curfew.dockerfile found (use 'curfew gen' to create one)" >&2
             exit 1
         fi
-        podman build --pull=always -t "localhost/${PROJECT_NAME}" -f .curfew.dockerfile .
+        podman build --pull=always "${build_flags[@]}" -t "localhost/${PROJECT_NAME}" -f .curfew.dockerfile .
         ;;
     gen)
         shift
