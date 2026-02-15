@@ -74,6 +74,7 @@ RUN curl -sSf https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstr
     && ubi --project F1bonacc1/process-compose --in /usr/local/bin \
     && ubi --project direnv/direnv --in /usr/local/bin \
     && ubi --project starship/starship --in /usr/local/bin \
+    && ubi --project cli/cli --exe gh --in /usr/local/bin \
     && ubi --project jesseduffield/lazygit --in /usr/local/bin \
     && ubi --project vercel-labs/agent-browser --in /usr/local/bin \
     && ubi --project steveyegge/beads --exe bd --in /usr/local/bin \
