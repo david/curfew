@@ -5,6 +5,7 @@ IMAGE="ghcr.io/david/curfew:latest"
 PROJECT_DIR="${1:-$(pwd)}"
 
 exec podman run --rm -it \
+    -e TERM="$TERM" \
     -e WAYLAND_DISPLAY="$WAYLAND_DISPLAY" \
     -e XDG_RUNTIME_DIR=/run/user/1000 \
     \
