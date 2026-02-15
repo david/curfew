@@ -16,7 +16,7 @@ curfew run            # open a bash shell
 curfew run lazygit    # run a specific command
 ```
 
-The launcher mounts the host project directory at the same path inside the container. A named volume (`curfew-<project>-app-home`) persists the home directory across runs and is shared by all workspaces under the same project.
+The launcher mounts the host project directory at `/app` inside the container. A named volume (`curfew-<project>-app-home`) persists the home directory across runs and is shared by all workspaces under the same project.
 
 ## What's included
 

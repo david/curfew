@@ -45,7 +45,7 @@ The Containerfile is organized in layers:
 
 The launcher script sets up all runtime mounts and runs the container:
 
-- **Project directory**: mounted at the same host path (`--workdir` sets cwd)
+- **Project directory**: mounted at `/app` inside the container (`--workdir /app`)
 - **Home volume**: named volume `<project-name>-app-home` at `/home/app` (persists shell history, caches, tool state across runs)
 - **Config files**: `~/.config/curfew` (override with `CURFEW_CONFIG`) mounted read-only at `/etc/curfew/config`
 - **Wayland**: `$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY` mounted into the container
@@ -94,4 +94,4 @@ To add a new install script: create `scripts/installs/<name>` following the same
 - Clean up apt caches in the same RUN layer (`apt-get clean && rm -rf /var/lib/apt/lists/*`).
 - Shell init (ble.sh, direnv, starship, atuin) is **not** baked into the image — provided via config file mounts.
 - Playwright uses system Chrome (`channel: 'chrome'`).
-- The container mounts the host project directory at the same path (no indirection).
+- The container mounts the host project directory at `/app`.

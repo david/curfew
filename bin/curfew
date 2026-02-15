@@ -26,7 +26,7 @@ start_container() {
         \
         -v "curfew-${PARENT_NAME}-app-home:/home/app" \
         -v "$CONFIG_DIR:/etc/curfew/config:ro,z" \
-        -v "$PROJECT_DIR:$PROJECT_DIR:z" \
+        -v "$PROJECT_DIR:/app:z" \
         \
         "$IMAGE" sleep infinity >/dev/null
 }
@@ -55,7 +55,7 @@ case "${1:-}" in
         fi
         exec podman exec -it \
             -e TERM="$TERM" \
-            -w "$PROJECT_DIR" \
+            -w /app \
             "$CONTAINER_NAME" \
             "$@"
         ;;
