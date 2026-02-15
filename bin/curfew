@@ -49,10 +49,10 @@ case "${1:-}" in
         ;;
     setup)
         ensure_running
-        exec podman exec -it \
+        podman exec -it \
             -e TERM="$TERM" \
             "$CONTAINER_NAME" \
-            /usr/local/setup/gh
+            bash -c 'for s in /usr/local/setup/*; do "$s"; done'
         ;;
     run)
         shift

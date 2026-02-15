@@ -1,13 +1,13 @@
 #!/bin/bash
 set -euo pipefail
 
-MARKER="$HOME/.local/state/gh-configured"
+MARKER="$HOME/.local/state/claude-configured"
 
 if [ -f "$MARKER" ]; then
-    echo "gh: already configured"
+    echo "claude: already configured"
     exit 0
 fi
 
-BROWSER="" gh auth login
+claude auth login
 mkdir -p "$(dirname "$MARKER")"
 touch "$MARKER"
