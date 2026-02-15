@@ -2,6 +2,7 @@
 set -euo pipefail
 
 IMAGE="ghcr.io/david/curfew:latest"
+CONFIG_DIR="${CURFEW_CONFIG:-$HOME/Dot/w0/config}"
 PROJECT_DIR="${1:-$(pwd)}"
 PROJECT_NAME="$(basename "$PROJECT_DIR" | tr '[:upper:]' '[:lower:]')"
 
@@ -15,6 +16,7 @@ exec podman run --rm -it \
     --device /dev/dri \
     \
     -v "${PROJECT_NAME}-app-home:/home/app" \
+    -v "$CONFIG_DIR:/etc/curfew/config:ro" \
     -v "$PROJECT_DIR:$PROJECT_DIR" \
     --workdir "$PROJECT_DIR" \
     \

@@ -88,6 +88,10 @@ RUN curl -L https://github.com/akinomyoga/ble.sh/releases/download/nightly/ble-n
 # Kitty terminfo
 COPY ../terminfo/x/xterm-kitty /usr/share/terminfo/x/xterm-kitty
 
+# Entrypoint (symlinks config files into ~app on each start)
+COPY ../scripts/entrypoint.sh /usr/local/bin/entrypoint
+RUN chmod +x /usr/local/bin/entrypoint
+
 RUN userdel -r ubuntu \
     && groupadd -g 1000 app \
     && useradd -u 1000 -g 1000 -m -s /bin/bash app \
@@ -95,3 +99,5 @@ RUN userdel -r ubuntu \
 
 USER app
 RUN curl -fsSL https://claude.ai/install.sh | bash
+ENTRYPOINT ["entrypoint"]
+CMD ["bash"]
