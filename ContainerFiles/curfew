@@ -20,6 +20,8 @@ RUN export DEBIAN_FRONTEND=noninteractive \
         libvulkan1 \
         # Clipboard (via Wayland)
         wl-clipboard \
+        # Notifications (via D-Bus)
+        libnotify-bin \
         # Core
         curl \
         wget \
@@ -42,6 +44,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
 
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
+ENV DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
 
 # Third-party apt repos
 COPY ../scripts/add-apt-repo.sh /usr/local/bin/add-apt-repo
