@@ -1,0 +1,16 @@
+#!/bin/bash
+set -euo pipefail
+
+# Install Google Chrome from the official repo.
+# Usage: /usr/local/installs/chrome
+
+export DEBIAN_FRONTEND=noninteractive
+
+add-apt-repo google-chrome \
+    https://dl-ssl.google.com/linux/linux_signing_key.pub \
+    http://dl.google.com/linux/chrome/deb/ stable main
+
+apt-get update
+apt-get install -y --no-install-recommends google-chrome-stable
+apt-get clean
+rm -rf /var/lib/apt/lists/*
