@@ -99,5 +99,6 @@ RUN userdel -r ubuntu \
 
 USER app
 RUN curl -fsSL https://claude.ai/install.sh | bash
+ENV PATH="/home/app/.local/bin:${PATH}"
 ENTRYPOINT ["entrypoint"]
 CMD ["bash"]

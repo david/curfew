@@ -4,14 +4,15 @@ set -euo pipefail
 IMAGE="ghcr.io/david/curfew:latest"
 CONFIG_DIR="${CURFEW_CONFIG:-$HOME/Dot/w0/config}"
 PROJECT_DIR="$(pwd)"
+PARENT_NAME="$(basename "$(dirname "$PROJECT_DIR")" | tr '[:upper:]' '[:lower:]')"
 PROJECT_NAME="$(basename "$PROJECT_DIR" | tr '[:upper:]' '[:lower:]')"
-CONTAINER_NAME="curfew-${PROJECT_NAME}"
-LOCK_FILE="${XDG_RUNTIME_DIR:-/tmp}/curfew-${PROJECT_NAME}.lock"
+CONTAINER_NAME="curfew-${PARENT_NAME}-${PROJECT_NAME}"
+LOCK_FILE="${XDG_RUNTIME_DIR:-/tmp}/${CONTAINER_NAME}.lock"
 
 start_container() {
     podman rm -f "$CONTAINER_NAME" &>/dev/null || true
 
-    podman run -d \
+    podman run -d 9>&- \
         --name "$CONTAINER_NAME" \
         -e TERM="$TERM" \
         -e WAYLAND_DISPLAY="$WAYLAND_DISPLAY" \
@@ -22,8 +23,8 @@ start_container() {
         --device /dev/dri \
         \
         -v "${PROJECT_NAME}-app-home:/home/app" \
-        -v "$CONFIG_DIR:/etc/curfew/config:ro" \
-        -v "$PROJECT_DIR:$PROJECT_DIR" \
+        -v "$CONFIG_DIR:/etc/curfew/config:ro,z" \
+        -v "$PROJECT_DIR:$PROJECT_DIR:z" \
         \
         "$IMAGE" sleep infinity >/dev/null
 }
