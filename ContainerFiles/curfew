@@ -37,7 +37,7 @@ RUN curl -sSf https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstr
     && ubi --project sharkdp/bat --in /usr/local/bin \
     && ubi --project eza-community/eza --in /usr/local/bin \
     && ubi --project atuinsh/atuin --in /usr/local/bin \
-    && ubi --project BurntSushi/ripgrep --in /usr/local/bin \
+    && ubi --project BurntSushi/ripgrep --exe rg --in /usr/local/bin \
     && ubi --project axllent/mailpit --in /usr/local/bin \
     && ubi --project F1bonacc1/process-compose --in /usr/local/bin \
     && ubi --project direnv/direnv --in /usr/local/bin \
