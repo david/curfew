@@ -47,7 +47,7 @@ The launcher script sets up all runtime mounts and runs the container:
 
 - **Project directory**: mounted at the same host path (`--workdir` sets cwd)
 - **Home volume**: named volume `<project-name>-app-home` at `/home/app` (persists shell history, caches, tool state across runs)
-- **Config files**: `~/Dot/w0/config` (override with `CURFEW_CONFIG`) mounted read-only at `/etc/curfew/config`
+- **Config files**: `~/.config/curfew` (override with `CURFEW_CONFIG`) mounted read-only at `/etc/curfew/config`
 - **Wayland**: `$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY` mounted into the container
 - **D-Bus**: session bus socket for notifications (`notify-send`)
 - **GPU**: `--device /dev/dri`

@@ -32,7 +32,7 @@ The launcher mounts the host project directory at the same path inside the conta
 
 ## Config files
 
-The launcher mounts a config directory (default `~/Dot/w0/config`, override with `CURFEW_CONFIG`) into the container. On each start, the entrypoint symlinks files into the home directory:
+The launcher mounts a config directory (default `~/.config/curfew`, override with `CURFEW_CONFIG`) into the container. On each start, the entrypoint symlinks files into the home directory:
 
 | Source path | Destination |
 |---|---|

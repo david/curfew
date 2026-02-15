@@ -2,7 +2,7 @@
 set -euo pipefail
 
 IMAGE="ghcr.io/david/curfew:latest"
-CONFIG_DIR="${CURFEW_CONFIG:-$HOME/Dot/w0/config}"
+CONFIG_DIR="${CURFEW_CONFIG:-$HOME/.config/curfew}"
 PROJECT_DIR="$(pwd)"
 PARENT_NAME="$(basename "$(dirname "$PROJECT_DIR")" | tr '[:upper:]' '[:lower:]')"
 PROJECT_NAME="$(basename "$PROJECT_DIR" | tr '[:upper:]' '[:lower:]')"
