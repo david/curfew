@@ -1,16 +1,31 @@
 #!/bin/bash
 set -euo pipefail
 
-IMAGE="ghcr.io/david/curfew:latest"
+BASE_IMAGE="ghcr.io/david/curfew:latest"
 CONFIG_DIR="${CURFEW_CONFIG:-$HOME/.config/curfew}"
-PROJECT_DIR="$(pwd)"
-PARENT_NAME="$(basename "$(dirname "$PROJECT_DIR")" | tr '[:upper:]' '[:lower:]')"
-PROJECT_NAME="$(basename "$PROJECT_DIR" | tr '[:upper:]' '[:lower:]')"
-CONTAINER_NAME="curfew-${PARENT_NAME}-${PROJECT_NAME}"
+TREE_DIR="$(pwd)"
+PROJECT_NAME="$(basename "$(dirname "$TREE_DIR")" | tr '[:upper:]' '[:lower:]')"
+TREE_NAME="$(basename "$TREE_DIR" | tr '[:upper:]' '[:lower:]')"
+CONTAINER_NAME="curfew-${PROJECT_NAME}-${TREE_NAME}"
 LOCK_FILE="${XDG_RUNTIME_DIR:-/tmp}/${CONTAINER_NAME}.lock"
 
+resolve_image() {
+    local local_image="localhost/${PROJECT_NAME}"
+    if podman image exists "$local_image" 2>/dev/null; then
+        echo "$local_image"
+    else
+        echo "$BASE_IMAGE"
+    fi
+}
+
 start_container() {
-    podman pull "$IMAGE" >/dev/null
+    local image
+    image="$(resolve_image)"
+
+    if [ "$image" = "$BASE_IMAGE" ]; then
+        podman pull "$image"
+    fi
+
     podman rm -f "$CONTAINER_NAME" &>/dev/null || true
 
     podman run -d 9>&- \
@@ -24,11 +39,11 @@ start_container() {
         -v "$XDG_RUNTIME_DIR/bus:/run/user/1000/bus" \
         --device /dev/dri \
         \
-        -v "curfew-${PARENT_NAME}-app-home:/home/app" \
+        -v "curfew-${PROJECT_NAME}-app-home:/home/app" \
         -v "$CONFIG_DIR:/etc/curfew/config:ro,z" \
-        -v "$PROJECT_DIR:/app:z" \
+        -v "$TREE_DIR:/app:z" \
         \
-        "$IMAGE" sleep infinity >/dev/null
+        "$image" sleep infinity >/dev/null
 }
 
 ensure_running() {
@@ -53,11 +68,22 @@ case "${1:-}" in
         if [ $# -eq 0 ]; then
             set -- bash
         fi
-        exec podman exec -it \
+        tty_flags="-i"
+        if [ -t 0 ] && [ -t 1 ]; then
+            tty_flags="-it"
+        fi
+        exec podman exec $tty_flags \
             -e TERM="$TERM" \
             -w /app \
             "$CONTAINER_NAME" \
             "$@"
+        ;;
+    build)
+        if [ ! -f ".curfew.dockerfile" ]; then
+            echo "No .curfew.dockerfile found (use 'curfew gen' to create one)" >&2
+            exit 1
+        fi
+        podman build -t "localhost/${PROJECT_NAME}" -f .curfew.dockerfile .
         ;;
     gen)
         shift
@@ -110,7 +136,7 @@ case "${1:-}" in
         echo "Created $DOCKERFILE"
         ;;
     *)
-        echo "Usage: curfew <gen|restart|run> [cmd...]" >&2
+        echo "Usage: curfew <build|gen|restart|run> [cmd...]" >&2
         exit 1
         ;;
 esac
