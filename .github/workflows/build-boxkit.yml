@@ -10,7 +10,7 @@ on:
     paths-ignore:
       - '**.md'
   schedule:
-    - cron: '0 0 * * TUE'
+    - cron: '0 8 * * *'
 
 env:
     IMAGE_TAGS: latest
