@@ -29,6 +29,19 @@ RUN export DEBIAN_FRONTEND=noninteractive \
         locales \
         xz-utils \
         gawk \
+        gnupg \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Third-party apt repos
+COPY ../scripts/add-apt-repo.sh /usr/local/bin/add-apt-repo
+RUN chmod +x /usr/local/bin/add-apt-repo \
+    && add-apt-repo google-chrome \
+        https://dl-ssl.google.com/linux/linux_signing_key.pub \
+        http://dl.google.com/linux/chrome/deb/ stable main \
+    && apt-get update \
+    && apt-get install -y \
+        google-chrome-stable \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -42,6 +55,8 @@ RUN curl -sSf https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstr
     && ubi --project F1bonacc1/process-compose --in /usr/local/bin \
     && ubi --project direnv/direnv --in /usr/local/bin \
     && ubi --project starship/starship --in /usr/local/bin \
+    && ubi --project vercel-labs/agent-browser --in /usr/local/bin \
+    && ubi --project steveyegge/beads --exe bd --in /usr/local/bin \
     && rm -f /usr/local/bin/ubi
 
 # ble.sh
