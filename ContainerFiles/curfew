@@ -89,10 +89,9 @@ RUN curl -L https://github.com/akinomyoga/ble.sh/releases/download/nightly/ble-n
 # Kitty terminfo
 COPY ../terminfo/x/xterm-kitty /usr/share/terminfo/x/xterm-kitty
 
-# Setup scripts (interactive first-run helpers)
-COPY ../scripts/setup/ /usr/local/setup/
-RUN chmod +x /usr/local/setup/*
-
+# Command aliases (wrappers that shadow /usr/local/bin)
+COPY ../scripts/alias/ /usr/local/alias/
+RUN chmod +x /usr/local/alias/*
 # Entrypoint (symlinks config files into ~app on each start)
 COPY ../scripts/entrypoint.sh /usr/local/bin/entrypoint
 RUN chmod +x /usr/local/bin/entrypoint
@@ -104,6 +103,6 @@ RUN userdel -r ubuntu \
 
 USER app
 RUN curl -fsSL https://claude.ai/install.sh | bash
-ENV PATH="/home/app/.local/bin:${PATH}"
+ENV PATH="/usr/local/alias:/home/app/.local/bin:${PATH}"
 ENTRYPOINT ["entrypoint"]
 CMD ["bash"]

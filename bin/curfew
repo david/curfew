@@ -47,13 +47,6 @@ case "${1:-}" in
             start_container
         ) 9>"$LOCK_FILE"
         ;;
-    setup)
-        ensure_running
-        podman exec -it \
-            -e TERM="$TERM" \
-            "$CONTAINER_NAME" \
-            bash -c 'for s in /usr/local/setup/*; do "$s"; done'
-        ;;
     run)
         shift
         ensure_running
@@ -67,7 +60,7 @@ case "${1:-}" in
             "$@"
         ;;
     *)
-        echo "Usage: curfew <restart|setup|run> [cmd...]" >&2
+        echo "Usage: curfew <restart|run> [cmd...]" >&2
         exit 1
         ;;
 esac

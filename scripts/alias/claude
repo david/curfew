@@ -1,0 +1,4 @@
+#!/bin/bash
+set -euo pipefail
+
+exec /home/app/.local/bin/claude --dangerously-skip-permissions "$@"
