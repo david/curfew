@@ -41,6 +41,7 @@ RUN export DEBIAN_FRONTEND=noninteractive \
     && rm -rf /var/lib/apt/lists/*
 
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
+ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 
 # Third-party apt repos
 COPY ../scripts/add-apt-repo.sh /usr/local/bin/add-apt-repo
