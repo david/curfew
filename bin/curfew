@@ -1,0 +1,17 @@
+#!/bin/bash
+set -euo pipefail
+
+IMAGE="ghcr.io/david/curfew:latest"
+PROJECT_DIR="${1:-$(pwd)}"
+
+exec podman run --rm -it \
+    -e WAYLAND_DISPLAY="$WAYLAND_DISPLAY" \
+    -e XDG_RUNTIME_DIR=/run/user/1000 \
+    \
+    -v "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY:/run/user/1000/$WAYLAND_DISPLAY:ro" \
+    -v "$XDG_RUNTIME_DIR/bus:/run/user/1000/bus" \
+    --device /dev/dri \
+    \
+    -v "$PROJECT_DIR:/app" \
+    \
+    "$IMAGE"
