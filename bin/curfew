@@ -13,6 +13,7 @@ exec podman run --rm -it \
     -v "$XDG_RUNTIME_DIR/bus:/run/user/1000/bus" \
     --device /dev/dri \
     \
-    -v "$PROJECT_DIR:/app" \
+    -v "$PROJECT_DIR:$PROJECT_DIR" \
+    --workdir "$PROJECT_DIR" \
     \
     "$IMAGE"
