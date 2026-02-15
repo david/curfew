@@ -3,21 +3,61 @@ set -euo pipefail
 
 IMAGE="ghcr.io/david/curfew:latest"
 CONFIG_DIR="${CURFEW_CONFIG:-$HOME/Dot/w0/config}"
-PROJECT_DIR="${1:-$(pwd)}"
+PROJECT_DIR="$(pwd)"
 PROJECT_NAME="$(basename "$PROJECT_DIR" | tr '[:upper:]' '[:lower:]')"
+CONTAINER_NAME="curfew-${PROJECT_NAME}"
+LOCK_FILE="${XDG_RUNTIME_DIR:-/tmp}/curfew-${PROJECT_NAME}.lock"
 
-exec podman run --rm -it \
-    -e TERM="$TERM" \
-    -e WAYLAND_DISPLAY="$WAYLAND_DISPLAY" \
-    -e XDG_RUNTIME_DIR=/run/user/1000 \
-    \
-    -v "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY:/run/user/1000/$WAYLAND_DISPLAY:ro" \
-    -v "$XDG_RUNTIME_DIR/bus:/run/user/1000/bus" \
-    --device /dev/dri \
-    \
-    -v "${PROJECT_NAME}-app-home:/home/app" \
-    -v "$CONFIG_DIR:/etc/curfew/config:ro" \
-    -v "$PROJECT_DIR:$PROJECT_DIR" \
-    --workdir "$PROJECT_DIR" \
-    \
-    "$IMAGE"
+start_container() {
+    podman rm -f "$CONTAINER_NAME" &>/dev/null || true
+
+    podman run -d \
+        --name "$CONTAINER_NAME" \
+        -e TERM="$TERM" \
+        -e WAYLAND_DISPLAY="$WAYLAND_DISPLAY" \
+        -e XDG_RUNTIME_DIR=/run/user/1000 \
+        \
+        -v "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY:/run/user/1000/$WAYLAND_DISPLAY:ro" \
+        -v "$XDG_RUNTIME_DIR/bus:/run/user/1000/bus" \
+        --device /dev/dri \
+        \
+        -v "${PROJECT_NAME}-app-home:/home/app" \
+        -v "$CONFIG_DIR:/etc/curfew/config:ro" \
+        -v "$PROJECT_DIR:$PROJECT_DIR" \
+        \
+        "$IMAGE" sleep infinity >/dev/null
+}
+
+ensure_running() {
+    (
+        flock -x 9
+        if [ "$(podman inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null)" != "true" ]; then
+            start_container
+        fi
+    ) 9>"$LOCK_FILE"
+}
+
+case "${1:-}" in
+    restart)
+        (
+            flock -x 9
+            start_container
+        ) 9>"$LOCK_FILE"
+        ;;
+    run)
+        shift
+        ensure_running
+        if [ $# -eq 0 ]; then
+            set -- bash
+        fi
+        exec podman exec -it \
+            -e TERM="$TERM" \
+            -w "$PROJECT_DIR" \
+            "$CONTAINER_NAME" \
+            "$@"
+        ;;
+    *)
+        echo "Usage: curfew <restart|run> [cmd...]" >&2
+        exit 1
+        ;;
+esac
