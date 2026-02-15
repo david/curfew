@@ -10,10 +10,12 @@ CONTAINER_NAME="curfew-${PARENT_NAME}-${PROJECT_NAME}"
 LOCK_FILE="${XDG_RUNTIME_DIR:-/tmp}/${CONTAINER_NAME}.lock"
 
 start_container() {
+    podman pull "$IMAGE" >/dev/null
     podman rm -f "$CONTAINER_NAME" &>/dev/null || true
 
     podman run -d 9>&- \
         --name "$CONTAINER_NAME" \
+        --userns=keep-id:uid=1000,gid=1000 \
         -e TERM="$TERM" \
         -e WAYLAND_DISPLAY="$WAYLAND_DISPLAY" \
         -e XDG_RUNTIME_DIR=/run/user/1000 \
@@ -22,7 +24,7 @@ start_container() {
         -v "$XDG_RUNTIME_DIR/bus:/run/user/1000/bus" \
         --device /dev/dri \
         \
-        -v "${PROJECT_NAME}-app-home:/home/app" \
+        -v "curfew-${PARENT_NAME}-app-home:/home/app" \
         -v "$CONFIG_DIR:/etc/curfew/config:ro,z" \
         -v "$PROJECT_DIR:$PROJECT_DIR:z" \
         \
