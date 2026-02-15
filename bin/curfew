@@ -59,8 +59,58 @@ case "${1:-}" in
             "$CONTAINER_NAME" \
             "$@"
         ;;
+    gen)
+        shift
+        DOCKERFILE=".curfew.dockerfile"
+        if [ -f "$DOCKERFILE" ]; then
+            echo "$DOCKERFILE already exists" >&2
+            exit 1
+        fi
+
+        installs=()
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                -i)
+                    [ $# -ge 2 ] || { echo "Missing argument for -i" >&2; exit 1; }
+                    installs+=("$2")
+                    shift 2
+                    ;;
+                *)
+                    echo "Unknown option: $1" >&2
+                    exit 1
+                    ;;
+            esac
+        done
+
+        {
+            echo "FROM ghcr.io/david/curfew:latest"
+            echo ""
+            echo "USER root"
+            echo ""
+            if [ ${#installs[@]} -gt 0 ]; then
+                for spec in "${installs[@]}"; do
+                    name="${spec%%:*}"
+                    version="${spec#*:}"
+                    if [ "$version" = "$spec" ]; then
+                        echo "RUN /usr/local/installs/$name"
+                    else
+                        echo "RUN /usr/local/installs/$name $version"
+                    fi
+                done
+            else
+                echo "# Install project tools (available scripts: node, postgres, bun)"
+                echo "# RUN /usr/local/installs/node 24"
+                echo "# RUN /usr/local/installs/bun"
+                echo "# RUN /usr/local/installs/postgres 17"
+            fi
+            echo ""
+            echo "USER app"
+        } > "$DOCKERFILE"
+
+        echo "Created $DOCKERFILE"
+        ;;
     *)
-        echo "Usage: curfew <restart|run> [cmd...]" >&2
+        echo "Usage: curfew <gen|restart|run> [cmd...]" >&2
         exit 1
         ;;
 esac
