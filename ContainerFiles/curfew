@@ -79,6 +79,9 @@ RUN curl -L https://github.com/akinomyoga/ble.sh/releases/download/nightly/ble-n
     && bash /tmp/ble-nightly/ble.sh --install /usr/local/share/blesh \
     && rm -rf /tmp/ble-nightly
 
+# Kitty terminfo
+COPY ../terminfo/x/xterm-kitty /usr/share/terminfo/x/xterm-kitty
+
 RUN userdel -r ubuntu \
     && groupadd -g 1000 app \
     && useradd -u 1000 -g 1000 -m -s /bin/bash app \
