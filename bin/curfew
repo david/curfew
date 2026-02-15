@@ -23,9 +23,11 @@ start_container() {
     image="$(resolve_image)"
 
     if [ "$image" = "$BASE_IMAGE" ]; then
+        echo "Pulling $image..." >&2
         podman pull "$image"
     fi
 
+    echo "Starting $CONTAINER_NAME ($image)..." >&2
     podman rm -f "$CONTAINER_NAME" &>/dev/null || true
 
     podman run -d 9>&- \
@@ -83,7 +85,7 @@ case "${1:-}" in
             echo "No .curfew.dockerfile found (use 'curfew gen' to create one)" >&2
             exit 1
         fi
-        podman build -t "localhost/${PROJECT_NAME}" -f .curfew.dockerfile .
+        podman build --pull=always -t "localhost/${PROJECT_NAME}" -f .curfew.dockerfile .
         ;;
     gen)
         shift
