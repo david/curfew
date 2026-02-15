@@ -1,0 +1,40 @@
+FROM docker.io/library/ubuntu:24.04
+
+LABEL summary="Curfew – isolated development environment" \
+      maintainer="david"
+
+RUN export DEBIAN_FRONTEND=noninteractive \
+    && apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
+        # Wayland
+        libwayland-client0 \
+        libwayland-cursor0 \
+        libwayland-egl1 \
+        # GPU / Mesa
+        mesa-utils \
+        libgl1-mesa-dri \
+        libglx-mesa0 \
+        libegl-mesa0 \
+        mesa-vulkan-drivers \
+        libvulkan1 \
+        # Clipboard (via Wayland)
+        wl-clipboard \
+        # Core
+        curl \
+        wget \
+        git \
+        ca-certificates \
+        bash \
+        locales \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN userdel -r ubuntu \
+    && groupadd -g 1000 app \
+    && useradd -u 1000 -g 1000 -m -s /bin/bash app \
+    && mkdir -p /app \
+    && chown app:app /app
+
+USER app
+WORKDIR /app
