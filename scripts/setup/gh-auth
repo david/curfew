@@ -1,0 +1,13 @@
+#!/bin/bash
+set -euo pipefail
+
+MARKER="$HOME/.local/state/gh-configured"
+
+if [ -f "$MARKER" ]; then
+    echo "gh: already configured"
+    exit 0
+fi
+
+gh auth login
+mkdir -p "$(dirname "$MARKER")"
+touch "$MARKER"
