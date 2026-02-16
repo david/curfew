@@ -26,3 +26,9 @@ rm -rf "$ruby_build_dir"
 
 # Build and install Ruby
 ruby-build "$version" /usr/local
+
+# Set up bundler to install gems to the persistent home volume
+cat > /etc/profile.d/deps-ruby.sh <<'EOF'
+export BUNDLE_PATH=/home/app/.deps/ruby
+export PATH="$BUNDLE_PATH/bin:$PATH"
+EOF

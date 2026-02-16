@@ -20,3 +20,9 @@ rm -rf /var/lib/apt/lists/*
 
 # Enable corepack so yarn and pnpm are on PATH
 corepack enable
+
+# Set up npm global installs to the persistent home volume
+cat > /etc/profile.d/deps-node.sh <<'EOF'
+export npm_config_prefix=/home/app/.deps/node
+export PATH="/home/app/.deps/node/bin:$PATH"
+EOF
