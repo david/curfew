@@ -28,10 +28,11 @@ start_container() {
     fi
 
     echo "Starting $CONTAINER_NAME ($image)..." >&2
-    podman rm -f "$CONTAINER_NAME" &>/dev/null || true
+    podman rm -f -t 0 "$CONTAINER_NAME" &>/dev/null || true
 
     podman run -d 9>&- \
         --name "$CONTAINER_NAME" \
+        --stop-signal SIGKILL \
         --userns=keep-id:uid=1000,gid=1000 \
         -e TERM="$TERM" \
         -e WAYLAND_DISPLAY="$WAYLAND_DISPLAY" \
