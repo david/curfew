@@ -84,9 +84,11 @@ case "${1:-}" in
     build)
         shift
         build_flags=()
+        restart_after=false
         while [ $# -gt 0 ]; do
             case "$1" in
                 -f|--force) build_flags+=(--no-cache); shift ;;
+                -r|--restart) restart_after=true; shift ;;
                 *) echo "Unknown option: $1" >&2; exit 1 ;;
             esac
         done
@@ -95,6 +97,12 @@ case "${1:-}" in
             exit 1
         fi
         podman build --pull=always "${build_flags[@]}" -t "localhost/${PROJECT_NAME}" -f .curfew.dockerfile .
+        if [ "$restart_after" = true ]; then
+            (
+                flock -x 9
+                start_container
+            ) 9>"$LOCK_FILE"
+        fi
         ;;
     gen)
         shift
