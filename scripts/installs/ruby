@@ -1,0 +1,28 @@
+#!/bin/bash
+set -euo pipefail
+
+# Install Ruby via ruby-build (compiled from source).
+# Usage: /usr/local/installs/ruby [version]
+# Default version: 4.0.1
+
+version="${1:-4.0.1}"
+
+export DEBIAN_FRONTEND=noninteractive
+
+# Build dependencies
+apt-get update
+apt-get install -y --no-install-recommends \
+    autoconf bison build-essential \
+    libssl-dev libyaml-dev libreadline-dev zlib1g-dev \
+    libncurses5-dev libffi-dev libgdbm-dev
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+
+# Install ruby-build
+ruby_build_dir="$(mktemp -d)"
+git clone --depth 1 https://github.com/rbenv/ruby-build.git "$ruby_build_dir"
+"$ruby_build_dir/install.sh"
+rm -rf "$ruby_build_dir"
+
+# Build and install Ruby
+ruby-build "$version" /usr/local
