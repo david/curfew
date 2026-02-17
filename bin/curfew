@@ -38,7 +38,7 @@ start_container() {
         -e WAYLAND_DISPLAY="$WAYLAND_DISPLAY" \
         -e XDG_RUNTIME_DIR=/run/user/1000 \
         \
-        -v "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY:/run/user/1000/$WAYLAND_DISPLAY:ro,z" \
+        -v "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY:/run/user/1000/$WAYLAND_DISPLAY:z" \
         -v "$XDG_RUNTIME_DIR/bus:/run/user/1000/bus:z" \
         --device /dev/dri \
         \
