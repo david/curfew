@@ -79,7 +79,7 @@ case "${1:-}" in
             -e TERM="$TERM" \
             -w /app \
             "$CONTAINER_NAME" \
-            bash -lc 'exec "$@"' -- "$@"
+            bash -lc 'PATH="/usr/local/alias:$PATH" exec "$@"' -- "$@"
         ;;
     build)
         shift
