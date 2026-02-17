@@ -82,6 +82,8 @@ COPY ../terminfo/x/xterm-kitty /usr/share/terminfo/x/xterm-kitty
 # Command aliases (wrappers that shadow /usr/local/bin)
 COPY ../scripts/alias/ /usr/local/alias/
 RUN chmod +x /usr/local/alias/*
+RUN printf 'PATH="/usr/local/alias:/home/app/.local/bin:$PATH"\n' \
+    > /etc/profile.d/curfew-path.sh
 # Entrypoint (symlinks config files into ~app on each start)
 COPY ../scripts/entrypoint.sh /usr/local/bin/entrypoint
 RUN chmod +x /usr/local/bin/entrypoint
