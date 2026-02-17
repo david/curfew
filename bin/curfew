@@ -44,8 +44,8 @@ start_container() {
         --device /dev/dri \
         \
         -v "curfew-${PROJECT_NAME}-app-home:/home/app" \
-        -v "$CONFIG_DIR:/etc/curfew/config:ro,z" \
-        -v "$TREE_DIR:/app:z" \
+        -v "$CONFIG_DIR:/etc/curfew/config:ro" \
+        -v "$TREE_DIR:/app" \
         \
         "$image" sleep infinity >/dev/null
 }
