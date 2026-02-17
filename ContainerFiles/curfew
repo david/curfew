@@ -22,6 +22,10 @@ RUN export DEBIAN_FRONTEND=noninteractive \
         wl-clipboard \
         # Notifications (via D-Bus)
         libnotify-bin \
+        # Fonts
+        fonts-liberation \
+        fonts-noto-color-emoji \
+        fontconfig \
         # Core
         curl \
         wget \
