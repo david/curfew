@@ -1,0 +1,37 @@
+#!/bin/bash
+set -euo pipefail
+
+# Install Conclave web chat interface for Claude Code.
+# Usage: /usr/local/installs/conclave [version]
+# Default: latest
+#
+# If Claude Code is detected, also installs @zed-industries/claude-code-acp.
+
+version="${1:-latest}"
+
+tmpdir=$(mktemp -d)
+trap 'rm -rf "$tmpdir"' EXIT
+
+# Download and extract conclave
+if [ "$version" = "latest" ]; then
+    url="https://github.com/david/conclave/releases/latest/download/conclave-linux-x64.zip"
+else
+    url="https://github.com/david/conclave/releases/download/v${version}/conclave-linux-x64.zip"
+fi
+
+curl -fsSL -o "$tmpdir/conclave.zip" "$url"
+unzip -q "$tmpdir/conclave.zip" -d "$tmpdir"
+sudo install -m 755 "$tmpdir/conclave" /usr/local/bin/conclave
+
+# If Claude Code is available, install the ACP adapter
+if command -v claude &>/dev/null; then
+    if ! command -v bun &>/dev/null && ! command -v npm &>/dev/null; then
+        sudo /usr/local/installs/bun
+    fi
+
+    if command -v bun &>/dev/null; then
+        bun install -g @zed-industries/claude-code-acp
+    else
+        npm install -g @zed-industries/claude-code-acp
+    fi
+fi

@@ -14,3 +14,8 @@ if [ "$version" = "latest" ]; then
 else
     curl -fsSL https://bun.sh/install | bash -s "bun-v${version}"
 fi
+
+# Make bun global installs available on PATH
+cat > /etc/profile.d/deps-bun.sh <<'EOF'
+export PATH="/home/app/.bun/bin:$PATH"
+EOF

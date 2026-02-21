@@ -99,6 +99,7 @@ RUN userdel -r ubuntu \
 
 USER app
 RUN curl -fsSL https://claude.ai/install.sh | bash
+RUN /usr/local/installs/conclave
 ENV PATH="/usr/local/alias:/home/app/.local/bin:${PATH}"
 ENTRYPOINT ["entrypoint"]
 CMD ["bash"]
