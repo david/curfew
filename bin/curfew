@@ -47,6 +47,7 @@ start_container() {
         -v "$CONFIG_DIR:/etc/curfew/config:ro" \
         -v "$TREE_DIR:/app" \
         \
+        "$@" \
         "$image" sleep infinity >/dev/null
 }
 
@@ -59,11 +60,37 @@ ensure_running() {
     ) 9>"$LOCK_FILE"
 }
 
+parse_port_flags() {
+    port_flags=()
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -p)
+                [ $# -ge 2 ] || { echo "Missing argument for -p" >&2; exit 1; }
+                port_flags+=(-p "$2"); shift 2 ;;
+            *) echo "Unknown option: $1" >&2; exit 1 ;;
+        esac
+    done
+}
+
 case "${1:-}" in
-    restart)
+    start)
+        shift
+        parse_port_flags "$@"
         (
             flock -x 9
-            start_container
+            if [ "$(podman inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null)" != "true" ]; then
+                start_container "${port_flags[@]}"
+            else
+                echo "$CONTAINER_NAME is already running" >&2
+            fi
+        ) 9>"$LOCK_FILE"
+        ;;
+    restart)
+        shift
+        parse_port_flags "$@"
+        (
+            flock -x 9
+            start_container "${port_flags[@]}"
         ) 9>"$LOCK_FILE"
         ;;
     run)
@@ -156,7 +183,8 @@ case "${1:-}" in
         echo "Created $DOCKERFILE"
         ;;
     *)
-        echo "Usage: curfew <build|gen|restart|run> [cmd...]" >&2
+        echo "Usage: curfew <build|gen|restart|run|start> [cmd...]" >&2
+        echo "       curfew start|restart [-p host:container]..." >&2
         exit 1
         ;;
 esac
