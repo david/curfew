@@ -12,16 +12,17 @@ version="${1:-latest}"
 tmpdir=$(mktemp -d)
 trap 'rm -rf "$tmpdir"' EXIT
 
-# Download and extract conclave
+# Resolve version tag
 if [ "$version" = "latest" ]; then
-    url="https://github.com/david/conclave/releases/latest/download/conclave-linux-x64.zip"
-else
-    url="https://github.com/david/conclave/releases/download/v${version}/conclave-linux-x64.zip"
+    version=$(curl -fsSL -o /dev/null -w '%{url_effective}' \
+        "https://github.com/david/conclave/releases/latest" | grep -oP 'v\K[^/]+$')
 fi
 
+# Download and extract conclave
+url="https://github.com/david/conclave/releases/download/v${version}/conclave-v${version}.zip"
 curl -fsSL -o "$tmpdir/conclave.zip" "$url"
 unzip -q "$tmpdir/conclave.zip" -d "$tmpdir"
-sudo install -m 755 "$tmpdir/conclave" /usr/local/bin/conclave
+sudo install -m 755 "$tmpdir/conclave-v${version}/conclave" /usr/local/bin/conclave
 
 # If Claude Code is available, install the ACP adapter
 if command -v claude &>/dev/null; then
