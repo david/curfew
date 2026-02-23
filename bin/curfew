@@ -41,7 +41,6 @@ start_container() {
         --security-opt label=disable \
         -v "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY:/run/user/1000/$WAYLAND_DISPLAY" \
         -v "$XDG_RUNTIME_DIR/bus:/run/user/1000/bus" \
-        --device /dev/dri \
         \
         -v "curfew-${PROJECT_NAME}-app-home:/home/app" \
         -v "$CONFIG_DIR:/etc/curfew/config:ro" \
