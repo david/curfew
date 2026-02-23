@@ -92,6 +92,10 @@ case "${1:-}" in
             start_container "${port_flags[@]}"
         ) 9>"$LOCK_FILE"
         ;;
+    stop)
+        podman rm -f -t 0 "$CONTAINER_NAME" &>/dev/null || true
+        echo "Stopped $CONTAINER_NAME" >&2
+        ;;
     run)
         shift
         ensure_running
@@ -182,7 +186,7 @@ case "${1:-}" in
         echo "Created $DOCKERFILE"
         ;;
     *)
-        echo "Usage: curfew <build|gen|restart|run|start> [cmd...]" >&2
+        echo "Usage: curfew <build|gen|restart|run|start|stop> [cmd...]" >&2
         echo "       curfew start|restart [-p host:container]..." >&2
         exit 1
         ;;
