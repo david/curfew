@@ -47,6 +47,9 @@ Usage: curfew <command> [args...]
   containerfile gen [--force] [-i tool[:version]]...
       Generate .curfew.containerfile in current directory
 
+  containerfile list
+      List available install scripts from the base image
+
   run [cmd...]
       Exec into the running container (default: bash)
 EOF
@@ -246,6 +249,10 @@ cmd_stop() {
     echo "Stopped $NAME@$TREE_NAME"
 }
 
+cmd_containerfile_list() {
+    podman run --rm "$BASE_IMAGE" ls /usr/local/installs/
+}
+
 cmd_containerfile_gen() {
     local force=false
     local installs=()
@@ -332,8 +339,9 @@ case "${1:-}" in
     containerfile)
         shift
         case "${1:-}" in
-            gen) shift; cmd_containerfile_gen "$@" ;;
-            *)   usage ;;
+            gen)  shift; cmd_containerfile_gen "$@" ;;
+            list) shift; cmd_containerfile_list ;;
+            *)    usage ;;
         esac
         ;;
     start)
