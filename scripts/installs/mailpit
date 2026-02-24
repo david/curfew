@@ -1,0 +1,21 @@
+#!/bin/bash
+set -euo pipefail
+
+# Install Mailpit email testing server.
+# Usage: /usr/local/installs/mailpit
+
+# Download binary via ubi
+curl -sSf https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/bootstrap-ubi.sh | sh
+ubi --project axllent/mailpit --in /usr/local/bin
+rm -f /usr/local/bin/ubi
+
+# Register s6-rc longrun service
+mkdir -p /etc/s6-overlay/s6-rc.d/svc-mailpit/dependencies.d
+printf "longrun\n" > /etc/s6-overlay/s6-rc.d/svc-mailpit/type
+cat <<'RUN' > /etc/s6-overlay/s6-rc.d/svc-mailpit/run
+#!/bin/bash
+exec mailpit
+RUN
+chmod +x /etc/s6-overlay/s6-rc.d/svc-mailpit/run
+touch /etc/s6-overlay/s6-rc.d/svc-mailpit/dependencies.d/init-config
+touch /etc/s6-overlay/s6-rc.d/user/contents.d/svc-mailpit

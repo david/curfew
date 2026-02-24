@@ -53,8 +53,9 @@ ENV S6_KEEP_ENV=1
 
 # Install helpers
 COPY ../scripts/add-apt-repo.sh /usr/local/bin/add-apt-repo
+COPY ../scripts/curfew /usr/local/bin/curfew
 COPY ../scripts/installs/ /usr/local/installs/
-RUN chmod +x /usr/local/bin/add-apt-repo /usr/local/installs/*
+RUN chmod +x /usr/local/bin/add-apt-repo /usr/local/bin/curfew /usr/local/installs/*
 
 # Chrome
 RUN /usr/local/installs/chrome
@@ -62,7 +63,6 @@ RUN /usr/local/installs/chrome
 # CLI tools via ubi
 RUN curl -sSf https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/bootstrap-ubi.sh | sh \
     && ubi --project BurntSushi/ripgrep --exe rg --in /usr/local/bin \
-    && ubi --project axllent/mailpit --in /usr/local/bin \
     && ubi --project cli/cli --exe gh --in /usr/local/bin \
     && ubi --project vercel-labs/agent-browser --in /usr/local/bin \
     && rm -f /usr/local/bin/ubi

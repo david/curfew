@@ -35,7 +35,7 @@ The Containerfile is organized in layers:
 3. **s6-overlay** — process supervisor and init system (see below)
 4. **Install helpers** — `add-apt-repo` and `scripts/installs/*` copied into the image
 5. **Chrome** — installed via `/usr/local/installs/chrome`
-6. **CLI tools via [ubi](https://github.com/houseabsolute/ubi)** — single-binary tools from GitHub releases (rg, mailpit, gh, agent-browser)
+6. **CLI tools via [ubi](https://github.com/houseabsolute/ubi)** — single-binary tools from GitHub releases (rg, gh, agent-browser)
 7. **s6-rc services** — `scripts/s6-rc.d/` and `scripts/s6-overlay-scripts/` copied into the image
 8. **User setup** — removes default `ubuntu` user, creates `app` (uid/gid 1000) with passwordless sudo
 9. **Claude Code** — installed as `app` user via official install script
@@ -141,6 +141,7 @@ Self-contained scripts copied to `/usr/local/installs/` in the image. Each scrip
 | Script | Default | Usage |
 |--------|---------|-------|
 | `chrome` | — | `/usr/local/installs/chrome` |
+| `mailpit` | latest | `/usr/local/installs/mailpit` |
 | `node` | v24 | `/usr/local/installs/node [major-version]` |
 | `postgres` | v17 | `/usr/local/installs/postgres [version]` |
 | `bun` | latest | `/usr/local/installs/bun [version]` |

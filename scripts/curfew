@@ -1,0 +1,47 @@
+#!/bin/bash
+set -euo pipefail
+
+INSTALLS_DIR="/usr/local/installs"
+
+usage() {
+    printf "Usage: curfew install [--user] <tool>[:<version>]\n" >&2
+    exit 1
+}
+
+cmd_install() {
+    local user_flag=""
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --user) user_flag="--user"; shift ;;
+            -*) printf "Unknown flag: %s\n" "$1" >&2; usage ;;
+            *) break ;;
+        esac
+    done
+
+    [[ $# -lt 1 ]] && usage
+
+    local spec="$1"
+    local tool="${spec%%:*}"
+    local version="${spec#*:}"
+    [[ "$version" = "$spec" ]] && version=""
+
+    local script="$INSTALLS_DIR/$tool"
+    if [[ ! -x "$script" ]]; then
+        printf "Unknown tool: %s\n" "$tool" >&2
+        printf "Available: %s\n" "$(ls "$INSTALLS_DIR" | tr '\n' ' ')" >&2
+        exit 1
+    fi
+
+    local args=()
+    [[ -n "$user_flag" ]] && args+=("$user_flag")
+    [[ -n "$version" ]] && args+=("$version")
+
+    exec "$script" "${args[@]}"
+}
+
+[[ $# -lt 1 ]] && usage
+
+case "$1" in
+    install) shift; cmd_install "$@" ;;
+    *) printf "Unknown command: %s\n" "$1" >&2; usage ;;
+esac
