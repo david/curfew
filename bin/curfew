@@ -6,160 +6,104 @@ CONFIG_DIR="${CURFEW_CONFIG:-$HOME/.config/curfew}"
 TREE_DIR="$(pwd)"
 PROJECT_NAME="$(basename "$(dirname "$TREE_DIR")" | tr '[:upper:]' '[:lower:]')"
 TREE_NAME="$(basename "$TREE_DIR" | tr '[:upper:]' '[:lower:]')"
-CONTAINER_NAME="curfew-${PROJECT_NAME}-${TREE_NAME}"
-LOCK_FILE="${XDG_RUNTIME_DIR:-/tmp}/${CONTAINER_NAME}.lock"
-
-resolve_image() {
-    local local_image="localhost/${PROJECT_NAME}"
-    if podman image exists "$local_image" 2>/dev/null; then
-        echo "$local_image"
-    else
-        echo "$BASE_IMAGE"
-    fi
-}
-
-start_container() {
-    local image
-    image="$(resolve_image)"
-
-    if [ "$image" = "$BASE_IMAGE" ]; then
-        echo "Pulling $image..." >&2
-        podman pull "$image"
-    fi
-
-    echo "Starting $CONTAINER_NAME ($image)..." >&2
-    podman rm -f -t 0 "$CONTAINER_NAME" &>/dev/null || true
-
-    podman run -d 9>&- \
-        --name "$CONTAINER_NAME" \
-        --stop-signal SIGKILL \
-        --userns=keep-id:uid=1000,gid=1000 \
-        -e TERM="$TERM" \
-        -e WAYLAND_DISPLAY="$WAYLAND_DISPLAY" \
-        -e XDG_RUNTIME_DIR=/run/user/1000 \
-        \
-        --security-opt label=disable \
-        -v "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY:/run/user/1000/$WAYLAND_DISPLAY" \
-        -v "$XDG_RUNTIME_DIR/bus:/run/user/1000/bus" \
-        \
-        -v "curfew-${PROJECT_NAME}-app-home:/home/app" \
-        -v "$CONFIG_DIR:/etc/curfew/config:ro" \
-        -v "$TREE_DIR:/app" \
-        \
-        "$@" \
-        "$image" sleep infinity >/dev/null
-}
-
-ensure_running() {
-    (
-        flock -x 9
-        if [ "$(podman inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null)" != "true" ]; then
-            start_container
-        fi
-    ) 9>"$LOCK_FILE"
-}
-
-parse_port_flags() {
-    port_flags=()
-    while [ $# -gt 0 ]; do
-        case "$1" in
-            -p)
-                [ $# -ge 2 ] || { echo "Missing argument for -p" >&2; exit 1; }
-                port_flags+=(-p "$2"); shift 2 ;;
-            *) echo "Unknown option: $1" >&2; exit 1 ;;
-        esac
-    done
-}
+UNIT_NAME="curfew-${PROJECT_NAME}-${TREE_NAME}"
+CONTAINER_NAME="$UNIT_NAME"
+QUADLET_DIR="$HOME/.config/containers/systemd"
 
 case "${1:-}" in
-    start)
+    gen)
         shift
-        parse_port_flags "$@"
-        (
-            flock -x 9
-            if [ "$(podman inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null)" != "true" ]; then
-                start_container "${port_flags[@]}"
-            else
-                echo "$CONTAINER_NAME is already running" >&2
-            fi
-        ) 9>"$LOCK_FILE"
-        ;;
-    restart)
-        shift
-        parse_port_flags "$@"
-        (
-            flock -x 9
-            start_container "${port_flags[@]}"
-        ) 9>"$LOCK_FILE"
-        ;;
-    stop)
-        podman rm -f -t 0 "$CONTAINER_NAME" &>/dev/null || true
-        echo "Stopped $CONTAINER_NAME" >&2
-        ;;
-    run)
-        shift
-        ensure_running
-        if [ $# -eq 0 ]; then
-            set -- bash
-        fi
-        tty_flags="-i"
-        if [ -t 0 ] && [ -t 1 ]; then
-            tty_flags="-it"
-        fi
-        exec podman exec $tty_flags \
-            -e TERM="$TERM" \
-            -w /app \
-            "$CONTAINER_NAME" \
-            bash -lc 'PATH="/usr/local/alias:$PATH" exec "$@"' -- "$@"
-        ;;
-    build)
-        shift
-        build_flags=()
-        restart_after=false
+        force=false
+        installs=()
+        ports=()
         while [ $# -gt 0 ]; do
             case "$1" in
-                -f|--force) build_flags+=(--no-cache); shift ;;
-                -r|--restart) restart_after=true; shift ;;
+                --force) force=true; shift ;;
+                -i)
+                    [ $# -ge 2 ] || { echo "Missing argument for -i" >&2; exit 1; }
+                    installs+=("$2"); shift 2 ;;
+                -p)
+                    [ $# -ge 2 ] || { echo "Missing argument for -p" >&2; exit 1; }
+                    ports+=("$2"); shift 2 ;;
                 *) echo "Unknown option: $1" >&2; exit 1 ;;
             esac
         done
-        if [ ! -f ".curfew.dockerfile" ]; then
-            echo "No .curfew.dockerfile found (use 'curfew gen' to create one)" >&2
-            exit 1
-        fi
-        podman build --pull=always "${build_flags[@]}" -t "localhost/${PROJECT_NAME}" -f .curfew.dockerfile .
-        if [ "$restart_after" = true ]; then
-            (
-                flock -x 9
-                start_container
-            ) 9>"$LOCK_FILE"
-        fi
-        ;;
-    gen)
-        shift
-        DOCKERFILE=".curfew.dockerfile"
-        if [ -f "$DOCKERFILE" ]; then
-            echo "$DOCKERFILE already exists" >&2
-            exit 1
+
+        # Check for existing files
+        quadlet_files=(
+            "$QUADLET_DIR/$UNIT_NAME.volume"
+            "$QUADLET_DIR/$UNIT_NAME.build"
+            "$QUADLET_DIR/$UNIT_NAME.container"
+        )
+        if [ "$force" = false ]; then
+            existing=()
+            for f in "${quadlet_files[@]}"; do
+                [ -f "$f" ] && existing+=("$f")
+            done
+            [ -f "$TREE_DIR/.curfew.dockerfile" ] && existing+=("$TREE_DIR/.curfew.dockerfile")
+            if [ ${#existing[@]} -gt 0 ]; then
+                echo "Files already exist (use --force to overwrite):" >&2
+                printf '  %s\n' "${existing[@]}" >&2
+                exit 1
+            fi
         fi
 
-        installs=()
-        while [ $# -gt 0 ]; do
-            case "$1" in
-                -i)
-                    [ $# -ge 2 ] || { echo "Missing argument for -i" >&2; exit 1; }
-                    installs+=("$2")
-                    shift 2
-                    ;;
-                *)
-                    echo "Unknown option: $1" >&2
-                    exit 1
-                    ;;
-            esac
-        done
+        mkdir -p "$QUADLET_DIR"
 
+        # Generate .volume
+        cat > "$QUADLET_DIR/$UNIT_NAME.volume" <<EOF
+[Volume]
+VolumeName=curfew-${PROJECT_NAME}-app-home
+EOF
+
+        # Generate .build
+        cat > "$QUADLET_DIR/$UNIT_NAME.build" <<EOF
+[Build]
+ImageTag=localhost/$PROJECT_NAME
+File=$TREE_DIR/.curfew.dockerfile
+SetWorkingDirectory=$TREE_DIR
+Pull=always
+EOF
+
+        # Generate .container
         {
-            echo "FROM ghcr.io/david/curfew:latest"
+            cat <<EOF
+[Unit]
+Description=Curfew dev environment ($PROJECT_NAME/$TREE_NAME)
+
+[Container]
+Image=$UNIT_NAME.build
+ContainerName=$CONTAINER_NAME
+Exec=sleep infinity
+StopSignal=SIGKILL
+UserNS=keep-id:uid=1000,gid=1000
+SecurityLabelDisable=true
+Environment=TERM=${TERM:-xterm-kitty}
+Environment=WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-wayland-0}
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Volume=$UNIT_NAME.volume:/home/app
+Volume=$CONFIG_DIR:/etc/curfew/config:ro
+Volume=$TREE_DIR:/app
+Volume=${XDG_RUNTIME_DIR:-/run/user/1000}/${WAYLAND_DISPLAY:-wayland-0}:/run/user/1000/${WAYLAND_DISPLAY:-wayland-0}
+Volume=${XDG_RUNTIME_DIR:-/run/user/1000}/bus:/run/user/1000/bus
+EOF
+            for port in "${ports[@]}"; do
+                echo "PublishPort=$port"
+            done
+            cat <<EOF
+
+[Service]
+Restart=on-failure
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target
+EOF
+        } > "$QUADLET_DIR/$UNIT_NAME.container"
+
+        # Generate .curfew.dockerfile
+        {
+            echo "FROM $BASE_IMAGE"
             echo ""
             echo "USER root"
             echo ""
@@ -181,13 +125,48 @@ case "${1:-}" in
             fi
             echo ""
             echo "USER app"
-        } > "$DOCKERFILE"
+        } > "$TREE_DIR/.curfew.dockerfile"
 
-        echo "Created $DOCKERFILE"
+        systemctl --user daemon-reload
+
+        echo "Generated:"
+        for f in "${quadlet_files[@]}"; do
+            echo "  $f"
+        done
+        echo "  $TREE_DIR/.curfew.dockerfile"
+        echo ""
+        echo "Start with:   systemctl --user start $UNIT_NAME"
+        echo "Stop with:    systemctl --user stop $UNIT_NAME"
+        echo "Logs with:    journalctl --user -u $UNIT_NAME"
+        ;;
+    run)
+        shift
+        if [ "$(podman inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null)" != "true" ]; then
+            echo "$CONTAINER_NAME is not running." >&2
+            echo "Start it with: systemctl --user start $UNIT_NAME" >&2
+            exit 1
+        fi
+        if [ $# -eq 0 ]; then
+            set -- bash
+        fi
+        tty_flags="-i"
+        if [ -t 0 ] && [ -t 1 ]; then
+            tty_flags="-it"
+        fi
+        exec podman exec $tty_flags \
+            -e TERM="$TERM" \
+            -w /app \
+            "$CONTAINER_NAME" \
+            bash -lc 'PATH="/usr/local/alias:$PATH" exec "$@"' -- "$@"
         ;;
     *)
-        echo "Usage: curfew <build|gen|restart|run|start|stop> [cmd...]" >&2
-        echo "       curfew start|restart [-p host:container]..." >&2
+        echo "Usage: curfew <gen|run> [args...]" >&2
+        echo "" >&2
+        echo "  gen [--force] [-i tool[:version]]... [-p host:container]..." >&2
+        echo "      Generate quadlet files and .curfew.dockerfile" >&2
+        echo "" >&2
+        echo "  run [cmd...]" >&2
+        echo "      Exec into the running container (default: bash)" >&2
         exit 1
         ;;
 esac

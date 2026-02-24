@@ -43,17 +43,33 @@ The Containerfile is organized in layers:
 
 ## Launcher (`bin/curfew`)
 
-The launcher script sets up all runtime mounts and runs the container:
+The launcher generates Podman Quadlet files and delegates container lifecycle to systemd. Two commands:
 
-- **Project directory**: mounted at `/app` inside the container (`--workdir /app`)
-- **Home volume**: named volume `<project-name>-app-home` at `/home/app` (persists shell history, caches, tool state across runs)
-- **Config files**: `~/.config/curfew` (override with `CURFEW_CONFIG`) mounted read-only at `/etc/curfew/config`
-- **Wayland**: `$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY` mounted into the container
-- **D-Bus**: session bus socket for notifications (`notify-send`)
-- **GPU**: `--device /dev/dri`
-- **TERM**: passed through for kitty terminfo
+### `curfew gen [--force] [-i tool[:version]]... [-p host:container]...`
 
-Usage: `curfew [project-dir]` (defaults to cwd)
+Generates four files and runs `systemctl --user daemon-reload`:
+
+- `~/.config/containers/systemd/<unit>.volume` — named volume (`curfew-<project>-app-home`, shared across worktrees)
+- `~/.config/containers/systemd/<unit>.build` — builds from `.curfew.dockerfile` with `Pull=always`
+- `~/.config/containers/systemd/<unit>.container` — container definition with all mounts, env, and ports
+- `.curfew.dockerfile` — in the project directory, `FROM ghcr.io/david/curfew:latest` plus install scripts
+
+Unit name is `curfew-<project>-<tree>` derived from the current directory. `--force` overwrites existing files. `-i` adds install script RUN lines to the Dockerfile. `-p` adds `PublishPort=` lines to the .container file.
+
+Environment values (`TERM`, `WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`, config dir, project dir) are baked at gen time. Re-run `gen --force` if they change.
+
+### `curfew run [cmd...]`
+
+Runs `podman exec -it` into the container (defaults to `bash`). Does **not** auto-start — prints a `systemctl --user start` hint if the container isn't running.
+
+### Lifecycle via systemd
+
+| Action | Command |
+|--------|---------|
+| Start | `systemctl --user start curfew-PROJECT-TREE` |
+| Stop | `systemctl --user stop curfew-PROJECT-TREE` |
+| Restart/rebuild | `systemctl --user restart curfew-PROJECT-TREE` |
+| Logs | `journalctl --user -u curfew-PROJECT-TREE` |
 
 ## Config File Mapping (entrypoint)
 
