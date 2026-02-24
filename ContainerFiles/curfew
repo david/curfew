@@ -44,14 +44,6 @@ ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome-stable
 ENV DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
 
-# s6-overlay (process supervisor)
-ARG S6_OVERLAY_VERSION=3.2.2.0
-ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp
-RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz && rm /tmp/s6-overlay-noarch.tar.xz
-ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-x86_64.tar.xz /tmp
-RUN tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz && rm /tmp/s6-overlay-x86_64.tar.xz
-ENV S6_KEEP_ENV=1
-
 # Install helpers
 COPY ../scripts/add-apt-repo.sh /usr/local/bin/add-apt-repo
 COPY ../scripts/curfew /usr/local/bin/curfew
@@ -74,10 +66,9 @@ RUN chmod +x /usr/local/alias/*
 RUN printf 'PATH="/usr/local/alias:$PATH"\n' \
     >> /etc/bash.bashrc
 
-# s6-rc service definitions and init scripts
-COPY ../scripts/s6-rc.d/ /etc/s6-overlay/s6-rc.d/
-COPY ../scripts/s6-overlay-scripts/ /etc/s6-overlay/scripts/
-RUN chmod +x /etc/s6-overlay/scripts/*
+# Entrypoint (config symlinking + autostart)
+COPY ../scripts/entrypoint.sh /usr/local/bin/entrypoint
+RUN chmod +x /usr/local/bin/entrypoint
 
 RUN curfew install conclave
 
@@ -90,5 +81,5 @@ USER app
 RUN curl -fsSL https://claude.ai/install.sh | bash
 RUN curfew install --user conclave
 ENV PATH="/usr/local/alias:/home/app/.local/bin:${PATH}"
-ENTRYPOINT ["/init"]
+ENTRYPOINT ["entrypoint"]
 CMD ["sleep", "infinity"]

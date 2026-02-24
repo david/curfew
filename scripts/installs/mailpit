@@ -9,13 +9,10 @@ curl -sSf https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/b
 ubi --project axllent/mailpit --in /usr/local/bin
 rm -f /usr/local/bin/ubi
 
-# Register s6-rc longrun service
-mkdir -p /etc/s6-overlay/s6-rc.d/svc-mailpit/dependencies.d
-printf "longrun\n" > /etc/s6-overlay/s6-rc.d/svc-mailpit/type
-cat <<'RUN' > /etc/s6-overlay/s6-rc.d/svc-mailpit/run
+# Register autostart script
+mkdir -p /usr/local/etc/curfew/autostart
+cat <<'AUTOSTART' > /usr/local/etc/curfew/autostart/mailpit
 #!/bin/bash
 exec mailpit
-RUN
-chmod +x /etc/s6-overlay/s6-rc.d/svc-mailpit/run
-touch /etc/s6-overlay/s6-rc.d/svc-mailpit/dependencies.d/init-config
-touch /etc/s6-overlay/s6-rc.d/user/contents.d/svc-mailpit
+AUTOSTART
+chmod +x /usr/local/etc/curfew/autostart/mailpit

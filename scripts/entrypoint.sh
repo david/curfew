@@ -47,3 +47,13 @@ if [ -d "$CONFIG_DIR" ]; then
         esac
     done
 fi
+
+# Run autostart scripts
+AUTOSTART_DIR="/usr/local/etc/curfew/autostart"
+if [ -d "$AUTOSTART_DIR" ]; then
+    for script in "$AUTOSTART_DIR"/*; do
+        [ -x "$script" ] && "$script" &
+    done
+fi
+
+exec "$@"

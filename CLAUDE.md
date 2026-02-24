@@ -17,8 +17,7 @@ The image is built by GitHub Actions (`.github/workflows/build-boxkit.yml`) usin
 ## Repository Structure
 
 - `ContainerFiles/curfew` — the Containerfile (the main artifact of this repo)
-- `scripts/s6-rc.d/` — s6-rc service definitions copied to `/etc/s6-overlay/s6-rc.d/` (see below)
-- `scripts/s6-overlay-scripts/` — s6-overlay init scripts copied to `/etc/s6-overlay/scripts/`
+- `scripts/entrypoint.sh` — container entrypoint: symlinks config files, runs autostart scripts, execs into `"$@"`
 - `scripts/add-apt-repo.sh` — reusable helper to add apt repos with GPG keys: `add-apt-repo <name> <key-url> <deb-url> [components...]`
 - `scripts/alias/` — command wrappers installed to `/usr/local/alias/` (shadow `/usr/local/bin`)
 - `scripts/installs/` — self-contained install scripts, copied to `/usr/local/installs/` in the image (see below)
@@ -32,13 +31,12 @@ The Containerfile is organized in layers:
 
 1. **Base apt packages** — Wayland libs, Mesa/GPU drivers, wl-clipboard, libnotify, core utilities, locale generation
 2. **ENV** — `LANG`, `LC_ALL` (en_US.UTF-8), `AGENT_BROWSER_EXECUTABLE_PATH` (system Chrome), `DBUS_SESSION_BUS_ADDRESS`
-3. **s6-overlay** — process supervisor and init system (see below)
-4. **Install helpers** — `add-apt-repo` and `scripts/installs/*` copied into the image
-5. **Chrome** — installed via `/usr/local/installs/chrome`
-6. **CLI tools via [ubi](https://github.com/houseabsolute/ubi)** — single-binary tools from GitHub releases (rg, gh, agent-browser)
-7. **s6-rc services** — `scripts/s6-rc.d/` and `scripts/s6-overlay-scripts/` copied into the image
-8. **User setup** — removes default `ubuntu` user, creates `app` (uid/gid 1000) with passwordless sudo
-9. **Claude Code** — installed as `app` user via official install script
+3. **Install helpers** — `add-apt-repo` and `scripts/installs/*` copied into the image
+4. **Chrome** — installed via `/usr/local/installs/chrome`
+5. **CLI tools via [ubi](https://github.com/houseabsolute/ubi)** — single-binary tools from GitHub releases (rg, gh, agent-browser)
+6. **Entrypoint** — `scripts/entrypoint.sh` copied to `/usr/local/bin/entrypoint` (config symlinking + autostart)
+7. **User setup** — removes default `ubuntu` user, creates `app` (uid/gid 1000) with passwordless sudo
+8. **Claude Code** — installed as `app` user via official install script
 
 ## Launcher (`bin/curfew`)
 
@@ -95,13 +93,17 @@ Reads name from `../.curfew.json`, derives tree from `basename $PWD`. Runs `podm
 | Restart/rebuild | `systemctl --user restart NAME@TREE` |
 | Logs | `journalctl --user -u NAME@TREE` |
 
-## Process Supervision (s6-overlay)
+## Entrypoint & Autostart
 
-The container uses [s6-overlay](https://github.com/just-containers/s6-overlay) as its init system (`ENTRYPOINT ["/init"]`). Services are managed via s6-rc service definitions.
+The container uses `scripts/entrypoint.sh` as its entrypoint (`ENTRYPOINT ["entrypoint"]`). On boot it:
 
-### Config file mapping (init-config oneshot)
+1. Symlinks config files from `/etc/curfew/config` into `/home/app`
+2. Runs autostart scripts from `/usr/local/etc/curfew/autostart/`
+3. Execs into `"$@"`
 
-The `init-config` oneshot service runs at boot before any longruns. It recursively symlinks **individual files** (not directories) from `/etc/curfew/config` into `/home/app`. This lets tools write their own state/caches alongside the symlinked config files.
+### Config file mapping
+
+The entrypoint recursively symlinks **individual files** (not directories) from `/etc/curfew/config` into `/home/app`. This lets tools write their own state/caches alongside the symlinked config files.
 
 Mapping rules:
 - `bash/*` → `~/.<filename>` (e.g. `bash/bashrc` → `~/.bashrc`)
@@ -110,28 +112,21 @@ Mapping rules:
 
 Nested directories are created as real directories with only leaf files symlinked.
 
-### s6-rc service definitions (`scripts/s6-rc.d/`)
+### Autostart scripts (`/usr/local/etc/curfew/autostart/`)
 
-Base services shipped in the image:
-- `init-config` — oneshot that symlinks config files (see above)
-- `user/contents.d/` — bundle that lists all services to start
+Executable scripts in this directory are run in the background at container boot (before `exec "$@"`). Install scripts register daemons here.
 
-Install scripts register additional longrun services (e.g. `svc-tailscale`, `svc-conclave`) by writing into `/etc/s6-overlay/s6-rc.d/` and touching entries in `user/contents.d/`.
+### Adding a background service via install scripts
 
-### Adding a supervised service via install scripts
-
-Install scripts should register s6-rc longrun services instead of autostart scripts:
+Install scripts should register autostart scripts for background daemons:
 
 ```bash
-mkdir -p /etc/s6-overlay/s6-rc.d/svc-NAME/dependencies.d
-printf "longrun\n" > /etc/s6-overlay/s6-rc.d/svc-NAME/type
-cat <<'RUN' > /etc/s6-overlay/s6-rc.d/svc-NAME/run
+mkdir -p /usr/local/etc/curfew/autostart
+cat <<'AUTOSTART' > /usr/local/etc/curfew/autostart/NAME
 #!/bin/bash
 exec my-daemon
-RUN
-chmod +x /etc/s6-overlay/s6-rc.d/svc-NAME/run
-touch /etc/s6-overlay/s6-rc.d/svc-NAME/dependencies.d/init-config
-touch /etc/s6-overlay/s6-rc.d/user/contents.d/svc-NAME
+AUTOSTART
+chmod +x /usr/local/etc/curfew/autostart/NAME
 ```
 
 ## Install Scripts (`scripts/installs/`)
@@ -144,11 +139,12 @@ Self-contained scripts copied to `/usr/local/installs/` in the image. Each scrip
 | `mailpit` | latest | `/usr/local/installs/mailpit` |
 | `node` | v24 | `/usr/local/installs/node [major-version]` |
 | `postgres` | v17 | `/usr/local/installs/postgres [version]` |
+| `process-compose` | latest | `/usr/local/installs/process-compose` |
 | `bun` | latest | `/usr/local/installs/bun [version]` |
 
 Chrome is installed in the base image. The others are available for downstream use.
 
-To add a new install script: create `scripts/installs/<name>` following the same pattern (set `DEBIAN_FRONTEND`, call `add-apt-repo` if needed, install, clean up). If the tool needs a background daemon, register an s6-rc longrun service (see "Adding a supervised service" above). If the script needs a user-phase step (e.g. installing packages as `app`), support `--user` as the first argument — the root phase runs by default, `--user` runs the app phase. The Containerfile calls the script twice: once as root, once as `USER app` with `--user`.
+To add a new install script: create `scripts/installs/<name>` following the same pattern (set `DEBIAN_FRONTEND`, call `add-apt-repo` if needed, install, clean up). If the tool needs a background daemon, register an autostart script (see "Adding a background service" above). If the script needs a user-phase step (e.g. installing packages as `app`), support `--user` as the first argument — the root phase runs by default, `--user` runs the app phase. The Containerfile calls the script twice: once as root, once as `USER app` with `--user`.
 
 ## Adding Tools
 

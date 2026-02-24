@@ -1,0 +1,22 @@
+#!/bin/bash
+set -euo pipefail
+
+# Install process-compose process manager.
+# Usage: /usr/local/installs/process-compose
+
+# Download binary via ubi
+curl -sSf https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/bootstrap-ubi.sh | sh
+ubi --project F1bonacc1/process-compose --in /usr/local/bin
+rm -f /usr/local/bin/ubi
+
+# Register autostart script (only starts if a compose file exists in /app)
+mkdir -p /usr/local/etc/curfew/autostart
+cat <<'AUTOSTART' > /usr/local/etc/curfew/autostart/process-compose
+#!/bin/bash
+for f in /app/process-compose.yml /app/process-compose.yaml /app/compose.yml /app/compose.yaml; do
+    if [ -f "$f" ]; then
+        exec process-compose up -f "$f" --tui=false
+    fi
+done
+AUTOSTART
+chmod +x /usr/local/etc/curfew/autostart/process-compose
