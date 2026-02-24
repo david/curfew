@@ -16,12 +16,14 @@ keyring="/usr/share/keyrings/${name}.gpg"
 tmpkey="$(mktemp)"
 curl -fsSL "$key_url" -o "$tmpkey"
 
-# Check if key is already in binary (dearmored) format
-if head -c1 "$tmpkey" | LC_ALL=C grep -qP '[\x80-\xff]'; then
-    mv "$tmpkey" "$keyring"
-else
+# Check if key is already in binary (dearmored) format.
+# Binary OpenPGP packets start with a byte >= 0x80. Detect by checking
+# whether the file starts with "-----" (armored) or not.
+if head -c5 "$tmpkey" | grep -q '^-----'; then
     gpg --dearmor -o "$keyring" < "$tmpkey"
     rm "$tmpkey"
+else
+    mv "$tmpkey" "$keyring"
 fi
 echo "deb [arch=amd64 signed-by=${keyring}] ${deb_url} ${components}" \
     > "/etc/apt/sources.list.d/${name}.list"

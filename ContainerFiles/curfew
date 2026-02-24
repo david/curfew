@@ -19,6 +19,9 @@ RUN export DEBIAN_FRONTEND=noninteractive \
         fonts-liberation \
         fonts-noto-color-emoji \
         fontconfig \
+        # D-Bus (required by Chrome, libnotify, etc.)
+        dbus \
+        dbus-x11 \
         # Core
         curl \
         wget \
@@ -29,7 +32,6 @@ RUN export DEBIAN_FRONTEND=noninteractive \
         xz-utils \
         gawk \
         gnupg \
-        man-db \
         less \
         file \
         sudo \

@@ -53,6 +53,13 @@ for f in /etc/profile.d/deps-*.sh; do
     [ -f "$f" ] && . "$f"
 done
 
+# Start a D-Bus session bus (Chrome, libnotify, etc. need it)
+if command -v dbus-daemon >/dev/null 2>&1; then
+    mkdir -p /run/user/1000
+    eval "$(dbus-launch --sh-syntax)"
+    export DBUS_SESSION_BUS_ADDRESS
+fi
+
 # Run autostart scripts
 AUTOSTART_DIR="/usr/local/etc/curfew/autostart"
 if [ -d "$AUTOSTART_DIR" ]; then
