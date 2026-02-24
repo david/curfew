@@ -14,3 +14,13 @@ apt-get update
 apt-get install -y --no-install-recommends tailscale
 apt-get clean
 rm -rf /var/lib/apt/lists/*
+
+# Register autostart
+mkdir -p /usr/local/etc/curfew/autostart
+cat <<'AUTOSTART' > /usr/local/etc/curfew/autostart/tailscale
+#!/bin/bash
+STATE_DIR="/home/app/.local/share/tailscale"
+mkdir -p "$STATE_DIR"
+exec tailscaled --tun=userspace-networking --statedir="$STATE_DIR"
+AUTOSTART
+chmod +x /usr/local/etc/curfew/autostart/tailscale

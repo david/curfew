@@ -48,11 +48,12 @@ if [ -d "$CONFIG_DIR" ]; then
     done
 fi
 
-# Start tailscaled if installed
-if command -v tailscaled &>/dev/null; then
-    STATE_DIR="$HOME_DIR/.local/share/tailscale"
-    mkdir -p "$STATE_DIR"
-    tailscaled --tun=userspace-networking --statedir="$STATE_DIR" &>/dev/null &
+# Run autostart scripts
+AUTOSTART_DIR="/usr/local/etc/curfew/autostart"
+if [ -d "$AUTOSTART_DIR" ]; then
+    for script in "$AUTOSTART_DIR"/*; do
+        [ -x "$script" ] && "$script" &
+    done
 fi
 
 exec "$@"

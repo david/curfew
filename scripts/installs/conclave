@@ -24,6 +24,14 @@ curl -fsSL -o "$tmpdir/conclave.zip" "$url"
 unzip -q "$tmpdir/conclave.zip" -d "$tmpdir"
 sudo install -m 755 "$tmpdir/conclave-v${version}/conclave" /usr/local/bin/conclave
 
+# Register autostart
+sudo mkdir -p /usr/local/etc/curfew/autostart
+cat <<'AUTOSTART' | sudo tee /usr/local/etc/curfew/autostart/conclave >/dev/null
+#!/bin/bash
+exec conclave &>/dev/null
+AUTOSTART
+sudo chmod +x /usr/local/etc/curfew/autostart/conclave
+
 # If Claude Code is available, install the ACP adapter
 if command -v claude &>/dev/null; then
     if ! command -v bun &>/dev/null && ! command -v npm &>/dev/null; then
