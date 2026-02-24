@@ -1,0 +1,16 @@
+#!/bin/bash
+set -euo pipefail
+
+# Install the Heroku CLI from the official apt repo.
+# Usage: /usr/local/installs/heroku
+
+export DEBIAN_FRONTEND=noninteractive
+
+add-apt-repo heroku \
+    https://cli-assets.heroku.com/channels/stable/apt/release.key \
+    "https://cli-assets.heroku.com/channels/stable/apt" ./
+
+apt-get update
+apt-get install -y --no-install-recommends heroku
+apt-get clean
+rm -rf /var/lib/apt/lists/*
