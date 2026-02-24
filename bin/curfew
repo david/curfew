@@ -2,171 +2,353 @@
 set -euo pipefail
 
 BASE_IMAGE="ghcr.io/david/curfew:latest"
-CONFIG_DIR="${CURFEW_CONFIG:-$HOME/.config/curfew}"
 TREE_DIR="$(pwd)"
-PROJECT_NAME="$(basename "$(dirname "$TREE_DIR")" | tr '[:upper:]' '[:lower:]')"
 TREE_NAME="$(basename "$TREE_DIR" | tr '[:upper:]' '[:lower:]')"
-UNIT_NAME="curfew-${PROJECT_NAME}-${TREE_NAME}"
-CONTAINER_NAME="$UNIT_NAME"
+PROJECT_DIR="$(dirname "$TREE_DIR")"
+CONFIG_DIR="${CURFEW_CONFIG:-$HOME/.config/curfew}"
 QUADLET_DIR="$HOME/.config/containers/systemd"
+SETTINGS_FILE="$PROJECT_DIR/.curfew.json"
 
-case "${1:-}" in
-    gen)
-        shift
-        force=false
-        installs=()
-        ports=()
-        while [ $# -gt 0 ]; do
-            case "$1" in
-                --force) force=true; shift ;;
-                -i)
-                    [ $# -ge 2 ] || { echo "Missing argument for -i" >&2; exit 1; }
-                    installs+=("$2"); shift 2 ;;
-                -p)
-                    [ $# -ge 2 ] || { echo "Missing argument for -p" >&2; exit 1; }
-                    ports+=("$2"); shift 2 ;;
-                *) echo "Unknown option: $1" >&2; exit 1 ;;
-            esac
+read_name() {
+    if [ ! -f "$SETTINGS_FILE" ]; then
+        echo "No .curfew.json found in $PROJECT_DIR" >&2
+        echo "Run 'curfew quadlet add <name>' first." >&2
+        exit 1
+    fi
+    NAME="$(sed -n 's/.*"name" *: *"\([^"]*\)".*/\1/p' "$SETTINGS_FILE")"
+    if [ -z "$NAME" ]; then
+        echo "Could not read name from $SETTINGS_FILE" >&2
+        exit 1
+    fi
+}
+
+usage() {
+    cat >&2 <<EOF
+Usage: curfew <command> [args...]
+
+  quadlet add <name> [--force] [-p host:container]...
+      Generate quadlet files and .curfew.json
+
+  quadlet rm
+      Remove quadlet files and .curfew.json
+
+  quadlet enable [tree]
+      Auto-start a tree on login (default: current dir name)
+
+  quadlet disable [tree]
+      Remove auto-start for a tree (default: current dir name)
+
+  start [-a|--autostart]
+      Start the current worktree's container
+
+  stop
+      Stop the current worktree's container
+
+  containerfile gen [--force] [-i tool[:version]]...
+      Generate .curfew.containerfile in current directory
+
+  run [cmd...]
+      Exec into the running container (default: bash)
+EOF
+    exit 1
+}
+
+cmd_quadlet_add() {
+    # Parse args: first positional is the name
+    local name="" force=false
+    local ports=()
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --force) force=true; shift ;;
+            -p)
+                [ $# -ge 2 ] || { echo "Missing argument for -p" >&2; exit 1; }
+                ports+=("$2"); shift 2 ;;
+            -*)
+                echo "Unknown option: $1" >&2; exit 1 ;;
+            *)
+                if [ -z "$name" ]; then
+                    name="$1"; shift
+                else
+                    echo "Unexpected argument: $1" >&2; exit 1
+                fi ;;
+        esac
+    done
+
+    if [ -z "$name" ]; then
+        echo "Usage: curfew quadlet add <name> [--force] [-p host:container]..." >&2
+        exit 1
+    fi
+
+    if [ ! -f "$TREE_DIR/.curfew.containerfile" ]; then
+        echo "No .curfew.containerfile found in $TREE_DIR" >&2
+        echo "Run 'curfew containerfile gen' first." >&2
+        exit 1
+    fi
+
+    local quadlet_files=(
+        "$QUADLET_DIR/$name.volume"
+        "$QUADLET_DIR/$name@.build"
+        "$QUADLET_DIR/$name@.container"
+    )
+
+    if [ "$force" = false ]; then
+        local existing=()
+        for f in "${quadlet_files[@]}"; do
+            [ -f "$f" ] && existing+=("$f")
         done
-
-        # Check for existing files
-        quadlet_files=(
-            "$QUADLET_DIR/$UNIT_NAME.volume"
-            "$QUADLET_DIR/$UNIT_NAME.build"
-            "$QUADLET_DIR/$UNIT_NAME.container"
-        )
-        if [ "$force" = false ]; then
-            existing=()
-            for f in "${quadlet_files[@]}"; do
-                [ -f "$f" ] && existing+=("$f")
-            done
-            [ -f "$TREE_DIR/.curfew.dockerfile" ] && existing+=("$TREE_DIR/.curfew.dockerfile")
-            if [ ${#existing[@]} -gt 0 ]; then
-                echo "Files already exist (use --force to overwrite):" >&2
-                printf '  %s\n' "${existing[@]}" >&2
-                exit 1
-            fi
+        [ -f "$SETTINGS_FILE" ] && existing+=("$SETTINGS_FILE")
+        if [ ${#existing[@]} -gt 0 ]; then
+            echo "Files already exist (use --force to overwrite):" >&2
+            printf '  %s\n' "${existing[@]}" >&2
+            exit 1
         fi
+    fi
 
-        mkdir -p "$QUADLET_DIR"
+    mkdir -p "$QUADLET_DIR"
 
-        # Generate .volume
-        cat > "$QUADLET_DIR/$UNIT_NAME.volume" <<EOF
+    # Generate .volume
+    cat > "$QUADLET_DIR/$name.volume" <<EOF
 [Volume]
-VolumeName=curfew-${PROJECT_NAME}-app-home
+VolumeName=$name-app-home
 EOF
 
-        # Generate .build
-        cat > "$QUADLET_DIR/$UNIT_NAME.build" <<EOF
+    # Generate @.build (template unit)
+    cat > "$QUADLET_DIR/$name@.build" <<EOF
 [Build]
-ImageTag=localhost/$PROJECT_NAME
-File=$TREE_DIR/.curfew.dockerfile
-SetWorkingDirectory=$TREE_DIR
+ImageTag=localhost/$name-%i
+File=$PROJECT_DIR/%i/.curfew.containerfile
+SetWorkingDirectory=$PROJECT_DIR/%i
 Pull=always
 EOF
 
-        # Generate .container
-        {
-            cat <<EOF
+    # Generate @.container (template unit)
+    {
+        cat <<EOF
 [Unit]
-Description=Curfew dev environment ($PROJECT_NAME/$TREE_NAME)
+Description=Curfew dev environment ($name/%i)
 
 [Container]
-Image=$UNIT_NAME.build
-ContainerName=$CONTAINER_NAME
-Exec=sleep infinity
-StopSignal=SIGKILL
+Image=$name@.build
+ContainerName=$name-%i
+StopSignal=SIGTERM
 UserNS=keep-id:uid=1000,gid=1000
 SecurityLabelDisable=true
 Environment=TERM=${TERM:-xterm-kitty}
 Environment=WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-wayland-0}
 Environment=XDG_RUNTIME_DIR=/run/user/1000
-Volume=$UNIT_NAME.volume:/home/app
+Volume=$name.volume:/home/app
 Volume=$CONFIG_DIR:/etc/curfew/config:ro
-Volume=$TREE_DIR:/app
+Volume=$PROJECT_DIR/%i:/app
 Volume=${XDG_RUNTIME_DIR:-/run/user/1000}/${WAYLAND_DISPLAY:-wayland-0}:/run/user/1000/${WAYLAND_DISPLAY:-wayland-0}
 Volume=${XDG_RUNTIME_DIR:-/run/user/1000}/bus:/run/user/1000/bus
 EOF
-            for port in "${ports[@]}"; do
-                echo "PublishPort=$port"
-            done
-            cat <<EOF
+        for port in "${ports[@]}"; do
+            echo "PublishPort=$port"
+        done
+        cat <<EOF
 
 [Service]
 Restart=on-failure
 TimeoutStopSec=10
-
-[Install]
-WantedBy=default.target
 EOF
-        } > "$QUADLET_DIR/$UNIT_NAME.container"
+    } > "$QUADLET_DIR/$name@.container"
 
-        # Generate .curfew.dockerfile
-        {
-            echo "FROM $BASE_IMAGE"
-            echo ""
-            echo "USER root"
-            echo ""
-            if [ ${#installs[@]} -gt 0 ]; then
-                for spec in "${installs[@]}"; do
-                    name="${spec%%:*}"
-                    version="${spec#*:}"
-                    if [ "$version" = "$spec" ]; then
-                        echo "RUN /usr/local/installs/$name"
-                    else
-                        echo "RUN /usr/local/installs/$name $version"
-                    fi
-                done
-            else
-                echo "# Install project tools (available scripts: node, ruby, postgres, bun, tailscale)"
-                echo "# RUN /usr/local/installs/node 24"
-                echo "# RUN /usr/local/installs/bun"
-                echo "# RUN /usr/local/installs/postgres 17"
-            fi
-            echo ""
-            echo "USER app"
-        } > "$TREE_DIR/.curfew.dockerfile"
+    # Write .curfew.json
+    printf '{"name": "%s"}\n' "$name" > "$SETTINGS_FILE"
 
-        systemctl --user daemon-reload
+    systemctl --user daemon-reload
 
-        echo "Generated:"
-        for f in "${quadlet_files[@]}"; do
-            echo "  $f"
-        done
-        echo "  $TREE_DIR/.curfew.dockerfile"
+    echo "Generated:"
+    for f in "${quadlet_files[@]}"; do
+        echo "  $f"
+    done
+    echo "  $SETTINGS_FILE"
+    echo ""
+    echo "Start with: curfew start"
+    echo "Auto-start: curfew quadlet enable"
+}
+
+cmd_quadlet_rm() {
+    read_name
+
+    local quadlet_files=(
+        "$QUADLET_DIR/$NAME.volume"
+        "$QUADLET_DIR/$NAME@.build"
+        "$QUADLET_DIR/$NAME@.container"
+    )
+
+    local removed=()
+    for f in "${quadlet_files[@]}"; do
+        if [ -f "$f" ]; then
+            rm "$f"
+            removed+=("$f")
+        fi
+    done
+    rm "$SETTINGS_FILE"
+    removed+=("$SETTINGS_FILE")
+
+    systemctl --user daemon-reload
+
+    echo "Removed:"
+    for f in "${removed[@]}"; do
+        echo "  $f"
+    done
+}
+
+cmd_quadlet_enable() {
+    local tree="${1:-$TREE_NAME}"
+    read_name
+    local wants_dir="$HOME/.config/systemd/user/default.target.wants"
+    local link="$wants_dir/$NAME@$tree.service"
+    if [ -L "$link" ]; then
+        echo "Already enabled: $NAME@$tree" >&2
+        exit 0
+    fi
+    mkdir -p "$wants_dir"
+    ln -s "/run/user/$(id -u)/systemd/generator/$NAME@.service" "$link"
+    systemctl --user daemon-reload
+    systemctl --user start "$NAME@$tree"
+    echo "Enabled $NAME@$tree (started and auto-start on login)"
+}
+
+cmd_quadlet_disable() {
+    local tree="${1:-$TREE_NAME}"
+    read_name
+    local link="$HOME/.config/systemd/user/default.target.wants/$NAME@$tree.service"
+    if [ ! -L "$link" ]; then
+        echo "Not enabled: $NAME@$tree" >&2
+        exit 0
+    fi
+    rm "$link"
+    systemctl --user daemon-reload
+    echo "Disabled $NAME@$tree"
+}
+
+cmd_start() {
+    local autostart=false
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -a|--autostart) autostart=true; shift ;;
+            *) echo "Unknown option: $1" >&2; exit 1 ;;
+        esac
+    done
+    read_name
+    systemctl --user start "$NAME@$TREE_NAME"
+    echo "Started $NAME@$TREE_NAME"
+    if [ "$autostart" = true ]; then
+        cmd_quadlet_enable "$TREE_NAME"
+    fi
+}
+
+cmd_stop() {
+    read_name
+    systemctl --user stop "$NAME@$TREE_NAME"
+    echo "Stopped $NAME@$TREE_NAME"
+}
+
+cmd_containerfile_gen() {
+    local force=false
+    local installs=()
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --force) force=true; shift ;;
+            -i)
+                [ $# -ge 2 ] || { echo "Missing argument for -i" >&2; exit 1; }
+                installs+=("$2"); shift 2 ;;
+            *) echo "Unknown option: $1" >&2; exit 1 ;;
+        esac
+    done
+
+    if [ "$force" = false ] && [ -f "$TREE_DIR/.curfew.containerfile" ]; then
+        echo "File already exists (use --force to overwrite):" >&2
+        echo "  $TREE_DIR/.curfew.containerfile" >&2
+        exit 1
+    fi
+
+    {
+        echo "FROM $BASE_IMAGE"
         echo ""
-        echo "Start with:   systemctl --user start $UNIT_NAME"
-        echo "Stop with:    systemctl --user stop $UNIT_NAME"
-        echo "Logs with:    journalctl --user -u $UNIT_NAME"
+        echo "USER root"
+        echo ""
+        if [ ${#installs[@]} -gt 0 ]; then
+            for spec in "${installs[@]}"; do
+                name="${spec%%:*}"
+                version="${spec#*:}"
+                if [ "$version" = "$spec" ]; then
+                    echo "RUN /usr/local/installs/$name"
+                else
+                    echo "RUN /usr/local/installs/$name $version"
+                fi
+            done
+        else
+            echo "# Install project tools (available scripts: node, ruby, postgres, bun, tailscale)"
+            echo "# RUN /usr/local/installs/node 24"
+            echo "# RUN /usr/local/installs/bun"
+            echo "# RUN /usr/local/installs/postgres 17"
+        fi
+        echo ""
+        echo "USER app"
+    } > "$TREE_DIR/.curfew.containerfile"
+
+    echo "Generated:"
+    echo "  $TREE_DIR/.curfew.containerfile"
+}
+
+cmd_run() {
+    read_name
+    local container_name="$NAME-$TREE_NAME"
+
+    if [ "$(podman inspect -f '{{.State.Running}}' "$container_name" 2>/dev/null)" != "true" ]; then
+        echo "$container_name is not running." >&2
+        echo "Start it with: curfew start" >&2
+        exit 1
+    fi
+    if [ $# -eq 0 ]; then
+        set -- bash
+    fi
+    local tty_flags="-i"
+    if [ -t 0 ] && [ -t 1 ]; then
+        tty_flags="-it"
+    fi
+    exec podman exec $tty_flags \
+        -e TERM="$TERM" \
+        -w /app \
+        "$container_name" \
+        bash -lc 'PATH="/usr/local/alias:$PATH" exec "$@"' -- "$@"
+}
+
+# Route commands
+case "${1:-}" in
+    quadlet)
+        shift
+        case "${1:-}" in
+            add)     shift; cmd_quadlet_add "$@" ;;
+            rm)      shift; cmd_quadlet_rm ;;
+            enable)  shift; cmd_quadlet_enable "$@" ;;
+            disable) shift; cmd_quadlet_disable "$@" ;;
+            *)       usage ;;
+        esac
+        ;;
+    containerfile)
+        shift
+        case "${1:-}" in
+            gen) shift; cmd_containerfile_gen "$@" ;;
+            *)   usage ;;
+        esac
+        ;;
+    start)
+        shift
+        cmd_start "$@"
+        ;;
+    stop)
+        shift
+        cmd_stop
         ;;
     run)
         shift
-        if [ "$(podman inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null)" != "true" ]; then
-            echo "$CONTAINER_NAME is not running." >&2
-            echo "Start it with: systemctl --user start $UNIT_NAME" >&2
-            exit 1
-        fi
-        if [ $# -eq 0 ]; then
-            set -- bash
-        fi
-        tty_flags="-i"
-        if [ -t 0 ] && [ -t 1 ]; then
-            tty_flags="-it"
-        fi
-        exec podman exec $tty_flags \
-            -e TERM="$TERM" \
-            -w /app \
-            "$CONTAINER_NAME" \
-            bash -lc 'PATH="/usr/local/alias:$PATH" exec "$@"' -- "$@"
+        cmd_run "$@"
         ;;
     *)
-        echo "Usage: curfew <gen|run> [args...]" >&2
-        echo "" >&2
-        echo "  gen [--force] [-i tool[:version]]... [-p host:container]..." >&2
-        echo "      Generate quadlet files and .curfew.dockerfile" >&2
-        echo "" >&2
-        echo "  run [cmd...]" >&2
-        echo "      Exec into the running container (default: bash)" >&2
-        exit 1
+        usage
         ;;
 esac

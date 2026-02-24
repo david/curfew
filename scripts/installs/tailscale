@@ -15,12 +15,15 @@ apt-get install -y --no-install-recommends tailscale
 apt-get clean
 rm -rf /var/lib/apt/lists/*
 
-# Register autostart
-mkdir -p /usr/local/etc/curfew/autostart
-cat <<'AUTOSTART' > /usr/local/etc/curfew/autostart/tailscale
+# Register s6-rc longrun service
+mkdir -p /etc/s6-overlay/s6-rc.d/svc-tailscale/dependencies.d
+printf "longrun\n" > /etc/s6-overlay/s6-rc.d/svc-tailscale/type
+cat <<'RUN' > /etc/s6-overlay/s6-rc.d/svc-tailscale/run
 #!/bin/bash
 STATE_DIR="/home/app/.local/share/tailscale"
 mkdir -p "$STATE_DIR"
 exec tailscaled --tun=userspace-networking --statedir="$STATE_DIR"
-AUTOSTART
-chmod +x /usr/local/etc/curfew/autostart/tailscale
+RUN
+chmod +x /etc/s6-overlay/s6-rc.d/svc-tailscale/run
+touch /etc/s6-overlay/s6-rc.d/svc-tailscale/dependencies.d/init-config
+touch /etc/s6-overlay/s6-rc.d/user/contents.d/svc-tailscale

@@ -17,7 +17,8 @@ The image is built by GitHub Actions (`.github/workflows/build-boxkit.yml`) usin
 ## Repository Structure
 
 - `ContainerFiles/curfew` — the Containerfile (the main artifact of this repo)
-- `scripts/entrypoint.sh` — entrypoint that symlinks config files into `/home/app` on each start
+- `scripts/s6-rc.d/` — s6-rc service definitions copied to `/etc/s6-overlay/s6-rc.d/` (see below)
+- `scripts/s6-overlay-scripts/` — s6-overlay init scripts copied to `/etc/s6-overlay/scripts/`
 - `scripts/add-apt-repo.sh` — reusable helper to add apt repos with GPG keys: `add-apt-repo <name> <key-url> <deb-url> [components...]`
 - `scripts/alias/` — command wrappers installed to `/usr/local/alias/` (shadow `/usr/local/bin`)
 - `scripts/installs/` — self-contained install scripts, copied to `/usr/local/installs/` in the image (see below)
@@ -32,48 +33,78 @@ The Containerfile is organized in layers:
 
 1. **Base apt packages** — Wayland libs, Mesa/GPU drivers, wl-clipboard, libnotify, core utilities, locale generation
 2. **ENV** — `LANG`, `LC_ALL` (en_US.UTF-8), `AGENT_BROWSER_EXECUTABLE_PATH` (system Chrome), `DBUS_SESSION_BUS_ADDRESS`
-3. **Install helpers** — `add-apt-repo` and `scripts/installs/*` copied into the image
-4. **Chrome** — installed via `/usr/local/installs/chrome`
-5. **CLI tools via [ubi](https://github.com/houseabsolute/ubi)** — single-binary tools from GitHub releases (bat, eza, atuin, rg, mailpit, process-compose, direnv, starship, lazygit, agent-browser, beads)
-6. **ble.sh** — installed to `/usr/local/share/blesh`
-7. **Kitty terminfo** — `xterm-kitty` copied to `/usr/share/terminfo/x/`
-8. **Entrypoint** — `scripts/entrypoint.sh` copied to `/usr/local/bin/entrypoint`
-9. **User setup** — removes default `ubuntu` user, creates `app` (uid/gid 1000) with passwordless sudo
-10. **Claude Code** — installed as `app` user via official install script
+3. **s6-overlay** — process supervisor and init system (see below)
+4. **Install helpers** — `add-apt-repo` and `scripts/installs/*` copied into the image
+5. **Chrome** — installed via `/usr/local/installs/chrome`
+6. **CLI tools via [ubi](https://github.com/houseabsolute/ubi)** — single-binary tools from GitHub releases (bat, eza, atuin, rg, mailpit, direnv, starship, lazygit, agent-browser, beads)
+7. **ble.sh** — installed to `/usr/local/share/blesh`
+8. **Kitty terminfo** — `xterm-kitty` copied to `/usr/share/terminfo/x/`
+9. **s6-rc services** — `scripts/s6-rc.d/` and `scripts/s6-overlay-scripts/` copied into the image
+10. **User setup** — removes default `ubuntu` user, creates `app` (uid/gid 1000) with passwordless sudo
+11. **Claude Code** — installed as `app` user via official install script
 
 ## Launcher (`bin/curfew`)
 
-The launcher generates Podman Quadlet files and delegates container lifecycle to systemd. Two commands:
+The launcher uses systemd template units (`NAME@TREE`) and Podman Quadlet files to manage per-worktree containers. A `.curfew.json` marker in the project parent directory ties worktrees to a shared set of quadlet files.
 
-### `curfew gen [--force] [-i tool[:version]]... [-p host:container]...`
+### Directory layout
 
-Generates four files and runs `systemctl --user daemon-reload`:
+```
+/home/user/projects/myapp/          # project parent dir
+├── .curfew.json                    # {"name": "myapp"} — written by quadlet add
+├── main/                           # worktree
+│   └── .curfew.dockerfile          # written by containerfile gen
+└── feature/                        # worktree
+    └── .curfew.dockerfile
+```
 
-- `~/.config/containers/systemd/<unit>.volume` — named volume (`curfew-<project>-app-home`, shared across worktrees)
-- `~/.config/containers/systemd/<unit>.build` — builds from `.curfew.dockerfile` with `Pull=always`
-- `~/.config/containers/systemd/<unit>.container` — container definition with all mounts, env, and ports
-- `.curfew.dockerfile` — in the project directory, `FROM ghcr.io/david/curfew:latest` plus install scripts
+Quadlet files in `~/.config/containers/systemd/`:
+```
+myapp.volume        # shared volume across all worktrees
+myapp@.build        # template — %i is the tree name
+myapp@.container    # template — %i is the tree name
+```
 
-Unit name is `curfew-<project>-<tree>` derived from the current directory. `--force` overwrites existing files. `-i` adds install script RUN lines to the Dockerfile. `-p` adds `PublishPort=` lines to the .container file.
+### `curfew quadlet add <name> [--force] [-p host:container]...`
 
-Environment values (`TERM`, `WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`, config dir, project dir) are baked at gen time. Re-run `gen --force` if they change.
+Generates three quadlet template files and writes `../.curfew.json`:
+
+- `NAME.volume` — named volume (`NAME-app-home`, shared across worktrees)
+- `NAME@.build` — template build unit, uses `%i` for the tree name
+- `NAME@.container` — template container unit with all mounts, env, and ports
+
+Runs `systemctl --user daemon-reload`. Refuses if files exist (unless `--force`). `-p` adds `PublishPort=` lines.
+
+Environment values (`TERM`, `WAYLAND_DISPLAY`, `XDG_RUNTIME_DIR`, config dir, project dir) are baked at gen time. Re-run `quadlet add --force` if they change.
+
+### `curfew quadlet rm`
+
+Reads name from `../.curfew.json`, removes the three quadlet files and `.curfew.json`, runs `systemctl --user daemon-reload`.
+
+### `curfew containerfile gen [--force] [-i tool[:version]]...`
+
+Generates `.curfew.dockerfile` in the current directory. `-i` adds install script `RUN` lines. Refuses if the file exists (unless `--force`).
 
 ### `curfew run [cmd...]`
 
-Runs `podman exec -it` into the container (defaults to `bash`). Does **not** auto-start — prints a `systemctl --user start` hint if the container isn't running.
+Reads name from `../.curfew.json`, derives tree from `basename $PWD`. Runs `podman exec -it` into `NAME-TREE` (defaults to `bash`). Does **not** auto-start — prints a `systemctl --user start NAME@TREE` hint if the container isn't running.
 
 ### Lifecycle via systemd
 
 | Action | Command |
 |--------|---------|
-| Start | `systemctl --user start curfew-PROJECT-TREE` |
-| Stop | `systemctl --user stop curfew-PROJECT-TREE` |
-| Restart/rebuild | `systemctl --user restart curfew-PROJECT-TREE` |
-| Logs | `journalctl --user -u curfew-PROJECT-TREE` |
+| Start | `systemctl --user start NAME@TREE` |
+| Stop | `systemctl --user stop NAME@TREE` |
+| Restart/rebuild | `systemctl --user restart NAME@TREE` |
+| Logs | `journalctl --user -u NAME@TREE` |
 
-## Config File Mapping (entrypoint)
+## Process Supervision (s6-overlay)
 
-On each start, `entrypoint.sh` recursively symlinks **individual files** (not directories) from `/etc/curfew/config` into `/home/app`. This lets tools write their own state/caches alongside the symlinked config files.
+The container uses [s6-overlay](https://github.com/just-containers/s6-overlay) as its init system (`ENTRYPOINT ["/init"]`). Services are managed via s6-rc service definitions.
+
+### Config file mapping (init-config oneshot)
+
+The `init-config` oneshot service runs at boot before any longruns. It recursively symlinks **individual files** (not directories) from `/etc/curfew/config` into `/home/app`. This lets tools write their own state/caches alongside the symlinked config files.
 
 Mapping rules:
 - `bash/*` → `~/.<filename>` (e.g. `bash/bashrc` → `~/.bashrc`)
@@ -81,6 +112,30 @@ Mapping rules:
 - Everything else → `~/.config/<name>/<files>` (e.g. `nvim/init.lua` → `~/.config/nvim/init.lua`)
 
 Nested directories are created as real directories with only leaf files symlinked.
+
+### s6-rc service definitions (`scripts/s6-rc.d/`)
+
+Base services shipped in the image:
+- `init-config` — oneshot that symlinks config files (see above)
+- `user/contents.d/` — bundle that lists all services to start
+
+Install scripts register additional longrun services (e.g. `svc-tailscale`, `svc-conclave`) by writing into `/etc/s6-overlay/s6-rc.d/` and touching entries in `user/contents.d/`.
+
+### Adding a supervised service via install scripts
+
+Install scripts should register s6-rc longrun services instead of autostart scripts:
+
+```bash
+mkdir -p /etc/s6-overlay/s6-rc.d/svc-NAME/dependencies.d
+printf "longrun\n" > /etc/s6-overlay/s6-rc.d/svc-NAME/type
+cat <<'RUN' > /etc/s6-overlay/s6-rc.d/svc-NAME/run
+#!/bin/bash
+exec my-daemon
+RUN
+chmod +x /etc/s6-overlay/s6-rc.d/svc-NAME/run
+touch /etc/s6-overlay/s6-rc.d/svc-NAME/dependencies.d/init-config
+touch /etc/s6-overlay/s6-rc.d/user/contents.d/svc-NAME
+```
 
 ## Install Scripts (`scripts/installs/`)
 
@@ -95,7 +150,7 @@ Self-contained scripts copied to `/usr/local/installs/` in the image. Each scrip
 
 Chrome is installed in the base image. The others are available for downstream use.
 
-To add a new install script: create `scripts/installs/<name>` following the same pattern (set `DEBIAN_FRONTEND`, call `add-apt-repo` if needed, install, clean up).
+To add a new install script: create `scripts/installs/<name>` following the same pattern (set `DEBIAN_FRONTEND`, call `add-apt-repo` if needed, install, clean up). If the tool needs a background daemon, register an s6-rc longrun service (see "Adding a supervised service" above). If the script needs a user-phase step (e.g. installing packages as `app`), support `--user` as the first argument — the root phase runs by default, `--user` runs the app phase. The Containerfile calls the script twice: once as root, once as `USER app` with `--user`.
 
 ## Adding Tools
 

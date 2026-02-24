@@ -2,11 +2,25 @@
 set -euo pipefail
 
 # Install Conclave web chat interface for Claude Code.
-# Usage: /usr/local/installs/conclave [version]
-# Default: latest
-#
-# If Claude Code is detected, also installs @zed-industries/claude-code-acp.
+# Usage: /usr/local/installs/conclave [version]   (root — install binary + s6-rc service)
+#        /usr/local/installs/conclave --user       (app  — install ACP adapter)
+# Default version: latest
 
+# --user phase: install the ACP adapter (requires claude + bun/npm as app user)
+if [ "${1:-}" = "--user" ]; then
+    if ! command -v bun &>/dev/null && ! command -v npm &>/dev/null; then
+        sudo /usr/local/installs/bun
+    fi
+
+    if command -v bun &>/dev/null; then
+        bun install -g @zed-industries/claude-code-acp
+    else
+        npm install -g @zed-industries/claude-code-acp
+    fi
+    exit 0
+fi
+
+# Root phase: install conclave binary and register service
 version="${1:-latest}"
 
 tmpdir=$(mktemp -d)
@@ -22,25 +36,15 @@ fi
 url="https://github.com/david/conclave/releases/download/v${version}/conclave-v${version}.zip"
 curl -fsSL -o "$tmpdir/conclave.zip" "$url"
 unzip -q "$tmpdir/conclave.zip" -d "$tmpdir"
-sudo install -m 755 "$tmpdir/conclave-v${version}/conclave" /usr/local/bin/conclave
+install -m 755 "$tmpdir/conclave-v${version}/conclave" /usr/local/bin/conclave
 
-# Register autostart
-sudo mkdir -p /usr/local/etc/curfew/autostart
-cat <<'AUTOSTART' | sudo tee /usr/local/etc/curfew/autostart/conclave >/dev/null
+# Register s6-rc longrun service
+mkdir -p /etc/s6-overlay/s6-rc.d/svc-conclave/dependencies.d
+printf "longrun\n" > /etc/s6-overlay/s6-rc.d/svc-conclave/type
+cat <<'RUN' > /etc/s6-overlay/s6-rc.d/svc-conclave/run
 #!/bin/bash
 exec conclave &>/dev/null
-AUTOSTART
-sudo chmod +x /usr/local/etc/curfew/autostart/conclave
-
-# If Claude Code is available, install the ACP adapter
-if command -v claude &>/dev/null; then
-    if ! command -v bun &>/dev/null && ! command -v npm &>/dev/null; then
-        sudo /usr/local/installs/bun
-    fi
-
-    if command -v bun &>/dev/null; then
-        bun install -g @zed-industries/claude-code-acp
-    else
-        npm install -g @zed-industries/claude-code-acp
-    fi
-fi
+RUN
+chmod +x /etc/s6-overlay/s6-rc.d/svc-conclave/run
+touch /etc/s6-overlay/s6-rc.d/svc-conclave/dependencies.d/init-config
+touch /etc/s6-overlay/s6-rc.d/user/contents.d/svc-conclave
