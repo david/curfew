@@ -23,7 +23,6 @@ The image is built by GitHub Actions (`.github/workflows/build-boxkit.yml`) usin
 - `scripts/alias/` — command wrappers installed to `/usr/local/alias/` (shadow `/usr/local/bin`)
 - `scripts/installs/` — self-contained install scripts, copied to `/usr/local/installs/` in the image (see below)
 - `bin/curfew` — launcher script (intended for `~/.local/bin`)
-- `terminfo/` — kitty terminfo, copied into the image at build time
 - `cosign.pub` — public key for image verification
 - `cosign.key` — private key (gitignored, never commit)
 
@@ -36,12 +35,10 @@ The Containerfile is organized in layers:
 3. **s6-overlay** — process supervisor and init system (see below)
 4. **Install helpers** — `add-apt-repo` and `scripts/installs/*` copied into the image
 5. **Chrome** — installed via `/usr/local/installs/chrome`
-6. **CLI tools via [ubi](https://github.com/houseabsolute/ubi)** — single-binary tools from GitHub releases (bat, eza, atuin, rg, mailpit, direnv, starship, lazygit, agent-browser, beads)
-7. **ble.sh** — installed to `/usr/local/share/blesh`
-8. **Kitty terminfo** — `xterm-kitty` copied to `/usr/share/terminfo/x/`
-9. **s6-rc services** — `scripts/s6-rc.d/` and `scripts/s6-overlay-scripts/` copied into the image
-10. **User setup** — removes default `ubuntu` user, creates `app` (uid/gid 1000) with passwordless sudo
-11. **Claude Code** — installed as `app` user via official install script
+6. **CLI tools via [ubi](https://github.com/houseabsolute/ubi)** — single-binary tools from GitHub releases (rg, mailpit, gh, agent-browser)
+7. **s6-rc services** — `scripts/s6-rc.d/` and `scripts/s6-overlay-scripts/` copied into the image
+8. **User setup** — removes default `ubuntu` user, creates `app` (uid/gid 1000) with passwordless sudo
+9. **Claude Code** — installed as `app` user via official install script
 
 ## Launcher (`bin/curfew`)
 
@@ -163,6 +160,6 @@ To add a new install script: create `scripts/installs/<name>` following the same
 - The Containerfile name must match the image name (`curfew`).
 - `--no-install-recommends` for all apt installs.
 - Clean up apt caches in the same RUN layer (`apt-get clean && rm -rf /var/lib/apt/lists/*`).
-- Shell init (ble.sh, direnv, starship, atuin) is **not** baked into the image — provided via config file mounts.
+- Shell init is **not** baked into the image — provided via config file mounts.
 - Playwright uses system Chrome (`channel: 'chrome'`).
 - The container mounts the host project directory at `/app`.

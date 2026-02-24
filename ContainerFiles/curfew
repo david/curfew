@@ -61,27 +61,11 @@ RUN /usr/local/installs/chrome
 
 # CLI tools via ubi
 RUN curl -sSf https://raw.githubusercontent.com/houseabsolute/ubi/master/bootstrap/bootstrap-ubi.sh | sh \
-    && ubi --project sharkdp/bat --in /usr/local/bin \
-    && ubi --project eza-community/eza --in /usr/local/bin \
-    && ubi --project atuinsh/atuin --in /usr/local/bin \
     && ubi --project BurntSushi/ripgrep --exe rg --in /usr/local/bin \
     && ubi --project axllent/mailpit --in /usr/local/bin \
-    && ubi --project direnv/direnv --in /usr/local/bin \
-    && ubi --project starship/starship --in /usr/local/bin \
     && ubi --project cli/cli --exe gh --in /usr/local/bin \
-    && ubi --project jesseduffield/lazygit --in /usr/local/bin \
     && ubi --project vercel-labs/agent-browser --in /usr/local/bin \
-    && ubi --project steveyegge/beads --exe bd --in /usr/local/bin \
     && rm -f /usr/local/bin/ubi
-
-# ble.sh
-RUN curl -L https://github.com/akinomyoga/ble.sh/releases/download/nightly/ble-nightly.tar.xz \
-    | tar xJf - -C /tmp \
-    && bash /tmp/ble-nightly/ble.sh --install /usr/local/share/blesh \
-    && rm -rf /tmp/ble-nightly
-
-# Kitty terminfo
-COPY ../terminfo/x/xterm-kitty /usr/share/terminfo/x/xterm-kitty
 
 # Command aliases (wrappers that shadow /usr/local/bin)
 COPY ../scripts/alias/ /usr/local/alias/
