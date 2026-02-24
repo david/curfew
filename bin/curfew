@@ -125,6 +125,9 @@ ImageTag=localhost/$name-%i
 File=$PROJECT_DIR/%i/.curfew.containerfile
 SetWorkingDirectory=$PROJECT_DIR/%i
 Pull=always
+
+[Service]
+TimeoutStartSec=270
 EOF
 
     # Generate @.container (template unit)
@@ -144,6 +147,7 @@ Environment=WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-wayland-0}
 Environment=XDG_RUNTIME_DIR=/run/user/1000
 Volume=$name.volume:/home/app
 Volume=$CONFIG_DIR:/etc/curfew/config:ro
+WorkingDir=/app
 Volume=$PROJECT_DIR/%i:/app
 Volume=${XDG_RUNTIME_DIR:-/run/user/1000}/${WAYLAND_DISPLAY:-wayland-0}:/run/user/1000/${WAYLAND_DISPLAY:-wayland-0}
 Volume=${XDG_RUNTIME_DIR:-/run/user/1000}/bus:/run/user/1000/bus

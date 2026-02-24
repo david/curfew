@@ -9,18 +9,18 @@ usage() {
 }
 
 cmd_install() {
-    local user_flag=""
+    local user_flag="" spec=""
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --user) user_flag="--user"; shift ;;
             -*) printf "Unknown flag: %s\n" "$1" >&2; usage ;;
-            *) break ;;
+            *)
+                [[ -n "$spec" ]] && { printf "Unexpected argument: %s\n" "$1" >&2; usage; }
+                spec="$1"; shift ;;
         esac
     done
 
-    [[ $# -lt 1 ]] && usage
-
-    local spec="$1"
+    [[ -z "$spec" ]] && usage
     local tool="${spec%%:*}"
     local version="${spec#*:}"
     [[ "$version" = "$spec" ]] && version=""

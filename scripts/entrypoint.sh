@@ -48,6 +48,11 @@ if [ -d "$CONFIG_DIR" ]; then
     done
 fi
 
+# Source environment from install scripts
+for f in /etc/profile.d/deps-*.sh; do
+    [ -f "$f" ] && . "$f"
+done
+
 # Run autostart scripts
 AUTOSTART_DIR="/usr/local/etc/curfew/autostart"
 if [ -d "$AUTOSTART_DIR" ]; then
