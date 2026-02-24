@@ -44,6 +44,9 @@ Usage: curfew <command> [args...]
   stop
       Stop the current worktree's container
 
+  rebuild
+      Rebuild and restart the current worktree's container
+
   containerfile gen [--force] [-i tool[:version]]...
       Generate .curfew.containerfile in current directory
 
@@ -152,6 +155,8 @@ EOF
 
 [Service]
 Restart=on-failure
+StartLimitBurst=2
+TimeoutStartSec=180
 TimeoutStopSec=10
 EOF
     } > "$QUADLET_DIR/$name@.container"
@@ -247,6 +252,12 @@ cmd_stop() {
     read_name
     systemctl --user stop "$NAME@$TREE_NAME"
     echo "Stopped $NAME@$TREE_NAME"
+}
+
+cmd_rebuild() {
+    read_name
+    systemctl --user restart "$NAME@$TREE_NAME"
+    echo "Rebuilt $NAME@$TREE_NAME"
 }
 
 cmd_containerfile_list() {
@@ -351,6 +362,10 @@ case "${1:-}" in
     stop)
         shift
         cmd_stop
+        ;;
+    rebuild)
+        shift
+        cmd_rebuild
         ;;
     run)
         shift
