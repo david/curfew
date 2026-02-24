@@ -174,7 +174,7 @@ case "${1:-}" in
                     fi
                 done
             else
-                echo "# Install project tools (available scripts: node, ruby, postgres, bun)"
+                echo "# Install project tools (available scripts: node, ruby, postgres, bun, tailscale)"
                 echo "# RUN /usr/local/installs/node 24"
                 echo "# RUN /usr/local/installs/bun"
                 echo "# RUN /usr/local/installs/postgres 17"

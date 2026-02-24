@@ -48,4 +48,11 @@ if [ -d "$CONFIG_DIR" ]; then
     done
 fi
 
+# Start tailscaled if installed
+if command -v tailscaled &>/dev/null; then
+    STATE_DIR="$HOME_DIR/.local/share/tailscale"
+    mkdir -p "$STATE_DIR"
+    tailscaled --tun=userspace-networking --statedir="$STATE_DIR" &>/dev/null &
+fi
+
 exec "$@"
